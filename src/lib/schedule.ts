@@ -55,26 +55,77 @@ export function generateSchedule(): Schedule {
   }
 
   const eligible: DayId[] = ["mon", "tue", "thu", "fri"];
-  const cnt: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
+
+  // WFH counts from locked assignments
+  const lockedCnt: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
   for (const days of Object.values(LOCKED_WFH)) {
-    for (const d of days) cnt[d as DayId]++;
+    for (const d of days) lockedCnt[d as DayId]++;
   }
 
-  for (const name of shuffle(TEAM_NAMES.filter((n) => !LOCKED_WFH[n]))) {
-    const scored = VALID_COMBOS.map((combo) => {
-      const c = { ...cnt };
-      for (const d of combo) c[d]++;
-      const vals = eligible.map((d) => c[d]);
-      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-      const v = vals.reduce((a, b) => a + (b - mean) ** 2, 0);
-      return { combo, v };
-    }).sort((a, b) => a.v - b.v);
+  // Target: spread total WFH evenly (8 people × 2 days / 4 eligible days = 4 per day)
+  const targetPerDay = Math.round((TEAM_NAMES.length * 2) / eligible.length);
+  const remaining: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
+  for (const d of eligible) remaining[d] = targetPerDay - lockedCnt[d];
 
-    const min = scored[0].v;
-    const best = scored.filter((s) => s.v === min);
-    const chosen = best[Math.floor(Math.random() * best.length)].combo;
-    result[name] = [...chosen];
-    for (const d of chosen) cnt[d]++;
+  const nonLocked = TEAM_NAMES.filter((n) => !LOCKED_WFH[n]);
+
+  // Find all combo count distributions that hit remaining targets exactly
+  // VALID_COMBOS order: [mon,tue]=x0, [mon,thu]=x1, [tue,thu]=x2, [tue,fri]=x3, [thu,fri]=x4
+  const distributions: number[][] = [];
+  const n = nonLocked.length;
+  for (let x0 = 0; x0 <= n; x0++) {
+    for (let x1 = 0; x1 <= n - x0; x1++) {
+      for (let x2 = 0; x2 <= n - x0 - x1; x2++) {
+        for (let x3 = 0; x3 <= n - x0 - x1 - x2; x3++) {
+          const x4 = n - x0 - x1 - x2 - x3;
+          if (
+            x0 + x1 === remaining.mon &&
+            x0 + x2 + x3 === remaining.tue &&
+            x1 + x2 + x4 === remaining.thu &&
+            x3 + x4 === remaining.fri
+          ) {
+            distributions.push([x0, x1, x2, x3, x4]);
+          }
+        }
+      }
+    }
+  }
+
+  let comboPool: DayId[][];
+
+  if (distributions.length > 0) {
+    // Pick a random perfectly balanced distribution
+    const counts = distributions[Math.floor(Math.random() * distributions.length)];
+    comboPool = [];
+    VALID_COMBOS.forEach((combo, i) => {
+      for (let j = 0; j < counts[i]; j++) comboPool.push(combo);
+    });
+  } else {
+    // Fallback: greedy variance minimization (original algorithm)
+    const cnt = { ...lockedCnt };
+    comboPool = [];
+    for (let i = 0; i < n; i++) {
+      const scored = VALID_COMBOS.map((combo) => {
+        const c = { ...cnt };
+        for (const d of combo) c[d]++;
+        const vals = eligible.map((d) => c[d]);
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const v = vals.reduce((a, b) => a + (b - mean) ** 2, 0);
+        return { combo, v };
+      }).sort((a, b) => a.v - b.v);
+      const min = scored[0].v;
+      const best = scored.filter((s) => s.v === min);
+      const chosen = best[Math.floor(Math.random() * best.length)].combo;
+      comboPool.push(chosen);
+      for (const d of chosen) cnt[d]++;
+    }
+  }
+
+  // Shuffle both independently so combo variety is retained across people
+  const people = shuffle(nonLocked);
+  const combos = shuffle(comboPool);
+  for (let i = 0; i < people.length; i++) {
+    result[people[i]] = [...combos[i]];
   }
   return result;
 }
