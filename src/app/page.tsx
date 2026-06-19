@@ -220,10 +220,10 @@ export default function Page() {
         <p className="type-h5 text-foreground mb-4">ตาราง WFH</p>
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="table-fixed w-full">
+            <Table className="w-full">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell sortable={false} className="w-48" fixed="left" fixedShadow="right">
+                  <TableHeaderCell sortable={false} fixed="left" fixedShadow="right">
                     พนักงาน
                   </TableHeaderCell>
                   {days.map((day) => (
