@@ -417,11 +417,11 @@ export default function Page() {
                                 key={d}
                                 text={WEEKDAYS.find((w) => w.id === d)?.label ?? d}
                                 variant="green"
-                                size="small"
+                                size="large"
                               />
                             ))
                           ) : (
-                            <Tag text="ออฟฟิศ" variant="gray" size="small" />
+                            <Tag text="ออฟฟิศ" variant="gray" size="large" />
                           )}
                         </div>
                       </div>
