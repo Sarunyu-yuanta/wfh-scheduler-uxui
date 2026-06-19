@@ -42,6 +42,8 @@ export default function Page() {
   const [preview, setPreview] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [canUndo, setCanUndo] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   useEffect(() => {
     fetch("/api/schedules")
@@ -50,6 +52,10 @@ export default function Page() {
         setSchedule(all[weekStart] ?? SEED_SCHEDULE)
       )
       .catch(() => setSchedule(SEED_SCHEDULE));
+    fetch("/api/schedules/undo")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(({ available }: { available: boolean }) => setCanUndo(available))
+      .catch(() => {});
   }, [weekStart]);
 
   // Animate progress bar while loading
@@ -87,8 +93,20 @@ export default function Page() {
       body: JSON.stringify({ weekStart, schedule: preview }),
     });
     setSchedule(preview);
+    setCanUndo(true);
     setModalOpen(false);
   }, [weekStart, preview]);
+
+  const undo = useCallback(async () => {
+    setIsUndoing(true);
+    const r = await fetch("/api/schedules/undo", { method: "POST" });
+    if (r.ok) {
+      const { schedule: prev } = await r.json();
+      setSchedule(prev);
+      setCanUndo(false);
+    }
+    setIsUndoing(false);
+  }, []);
 
   const inOfficeCount = (dayId: DayId) =>
     TEAM_NAMES.filter((n) => !schedule[n]?.includes(dayId)).length;
@@ -106,9 +124,16 @@ export default function Page() {
             </p>
           </div>
           {/* Desktop only — mobile uses sticky bar below */}
-          <Button variant="primary" size="xl" onClick={openModal} className="hidden sm:flex">
-            สุ่มตาราง WFH
-          </Button>
+          <div className="hidden sm:flex items-center gap-2">
+            {canUndo && (
+              <Button variant="outline" size="xl" onClick={undo} disabled={isUndoing}>
+                {isUndoing ? "กำลังย้อนกลับ..." : "ย้อนกลับ"}
+              </Button>
+            )}
+            <Button variant="primary" size="xl" onClick={openModal}>
+              สุ่มตาราง WFH
+            </Button>
+          </div>
         </div>
 
         {/* Day summary cards */}
@@ -302,7 +327,12 @@ export default function Page() {
       </div>
 
       {/* Sticky bottom bar — mobile only */}
-      <div className="fixed bottom-0 left-0 right-0 sm:hidden bg-card border-t border-border px-6 py-4">
+      <div className="fixed bottom-0 left-0 right-0 sm:hidden bg-card border-t border-border px-6 py-4 flex flex-col gap-2">
+        {canUndo && (
+          <Button variant="outline" size="xl" onClick={undo} disabled={isUndoing} className="w-full">
+            {isUndoing ? "กำลังย้อนกลับ..." : "ย้อนกลับ"}
+          </Button>
+        )}
         <Button variant="primary" size="xl" onClick={openModal} className="w-full">
           สุ่มตาราง WFH
         </Button>

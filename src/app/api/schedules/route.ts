@@ -55,6 +55,22 @@ export async function POST(req: Request) {
     await ensureTable();
     const sql = getSql();
 
+    // Snapshot current schedule before overwriting (enables 1-level undo)
+    const monthKey = weekStart.slice(0, 7);
+    const current = await sql`
+      SELECT schedule FROM schedule_weeks
+      WHERE week_start >= date_trunc('month', ${weekStart}::date)
+        AND week_start < date_trunc('month', ${weekStart}::date) + INTERVAL '1 month'
+      LIMIT 1
+    `;
+    if (current.length > 0) {
+      await sql`
+        INSERT INTO schedule_undo (month_key, schedule)
+        VALUES (${monthKey}, ${JSON.stringify(current[0].schedule)})
+        ON CONFLICT (month_key) DO UPDATE SET schedule = EXCLUDED.schedule, saved_at = now()
+      `;
+    }
+
     // Update all weeks in the same month
     await sql`
       UPDATE schedule_weeks
