@@ -8,6 +8,7 @@ import {
   Avatar,
   AvatarStack,
   Tag,
+  Alert,
   Modal,
   BottomSheet,
   LinearProgress,
@@ -66,7 +67,7 @@ export default function Page() {
     fetch("/api/schedules")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((all: Record<string, Schedule>) =>
-        setSchedule(all[weekStart] ?? SEED_SCHEDULE)
+        setSchedule(all[weekStart] ?? SEED_SCHEDULE),
       )
       .catch(() => setSchedule(SEED_SCHEDULE));
   }, [weekStart]);
@@ -116,14 +117,16 @@ export default function Page() {
     });
     setSchedule(preview);
     setModalOpen(false);
-    setToasts([{
-      id: "undo-toast",
-      message: "บันทึกตารางใหม่แล้ว",
-      actionLabel: "Undo",
-      status: "success",
-      onActionClick: undo,
-      onClose: () => removeToast("undo-toast"),
-    }]);
+    setToasts([
+      {
+        id: "undo-toast",
+        message: "บันทึกตารางใหม่แล้ว",
+        actionLabel: "Undo",
+        status: "success",
+        onActionClick: undo,
+        onClose: () => removeToast("undo-toast"),
+      },
+    ]);
   }, [weekStart, preview, undo, removeToast]);
 
   const inOfficeCount = (dayId: DayId) =>
@@ -132,7 +135,6 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1024px] mx-auto px-6 pt-6 pb-28 sm:pb-8">
-
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
@@ -142,7 +144,12 @@ export default function Page() {
             </p>
           </div>
           {/* Desktop only — mobile uses sticky bar below */}
-          <Button variant="primary" size="xl" onClick={openModal} className="hidden sm:flex">
+          <Button
+            variant="primary"
+            size="xl"
+            onClick={openModal}
+            className="hidden sm:flex"
+          >
             สุ่มตาราง WFH
           </Button>
         </div>
@@ -154,7 +161,7 @@ export default function Page() {
               ? TEAM_NAMES.filter((n) => schedule[n]?.includes(day.id))
               : [];
             const officeMembers = TEAM_NAMES.filter(
-              (n) => !wfhMembers.includes(n)
+              (n) => !wfhMembers.includes(n),
             );
             const toItems = (names: string[]) =>
               names.map((name) => ({
@@ -163,7 +170,10 @@ export default function Page() {
                 initials: name[0],
               }));
             return (
-              <div key={day.id} className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3">
+              <div
+                key={day.id}
+                className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3"
+              >
                 <p className="type-subtitle-1 text-foreground">{day.label}</p>
 
                 {/* Office group */}
@@ -171,7 +181,11 @@ export default function Page() {
                   <p className="type-caption text-muted-foreground">
                     ออฟฟิศ {officeMembers.length} คน
                   </p>
-                  <AvatarStack items={toItems(officeMembers)} size="large" max={8} />
+                  <AvatarStack
+                    items={toItems(officeMembers)}
+                    size="large"
+                    max={8}
+                  />
                 </div>
 
                 {/* WFH group */}
@@ -181,7 +195,11 @@ export default function Page() {
                       WFH {wfhMembers.length} คน
                     </p>
                     {wfhMembers.length > 0 ? (
-                      <AvatarStack items={toItems(wfhMembers)} size="large" max={8} />
+                      <AvatarStack
+                        items={toItems(wfhMembers)}
+                        size="large"
+                        max={8}
+                      />
                     ) : (
                       <p className="type-caption text-muted-foreground">—</p>
                     )}
@@ -202,9 +220,15 @@ export default function Page() {
             <Table className="table-fixed w-full">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell sortable={false} className="w-48">พนักงาน</TableHeaderCell>
+                  <TableHeaderCell sortable={false} className="w-48">
+                    พนักงาน
+                  </TableHeaderCell>
                   {days.map((day) => (
-                    <TableHeaderCell key={day.id} sortable={false} className="w-32 th-day-center">
+                    <TableHeaderCell
+                      key={day.id}
+                      sortable={false}
+                      className="w-32 th-day-center"
+                    >
                       {day.label}
                     </TableHeaderCell>
                   ))}
@@ -216,7 +240,9 @@ export default function Page() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <TeamAvatar name={name} size="m" />
-                        <span className="type-body-2 text-foreground">{name}</span>
+                        <span className="type-body-2 text-foreground">
+                          {name}
+                        </span>
                         {LOCKED_WFH[name] && (
                           <Tag text="ล็อควัน" variant="yellow" size="small" />
                         )}
@@ -256,18 +282,24 @@ export default function Page() {
           {[
             { label: "Work From Home", variant: "green" as const, text: "WFH" },
             { label: "เข้าออฟฟิศ", variant: "gray" as const, text: "ออฟฟิศ" },
-            { label: "วัน WFH กำหนดตายตัว", variant: "yellow" as const, text: "ล็อควัน" },
+            {
+              label: "วัน WFH กำหนดตายตัว",
+              variant: "yellow" as const,
+              text: "ล็อควัน",
+            },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               <Tag text={item.text} variant={item.variant} size="small" />
-              <span className="type-caption text-muted-foreground">{item.label}</span>
+              <span className="type-caption text-muted-foreground">
+                {item.label}
+              </span>
             </div>
           ))}
         </div>
 
         {/* Co-presence section */}
         <div className="border-t border-border mt-10 mb-6" />
-        <p className="type-h5 text-foreground mb-4">แต่ละคนเจอใครบ้าง</p>
+        <p className="type-h5 text-foreground mb-4">แต่ละคนจะเจอใครกี่วัน</p>
         {(() => {
           const allDays: DayId[] = ["mon", "tue", "wed", "thu", "fri"];
           const officeDays = (name: string) =>
@@ -277,7 +309,11 @@ export default function Page() {
             return officeDays(b).filter((d) => setA.has(d)).length;
           };
           const tagVariant = (n: number) =>
-            n >= 3 ? ("green" as const) : n === 2 ? ("blue" as const) : ("gray" as const);
+            n >= 3
+              ? ("green" as const)
+              : n === 2
+                ? ("blue" as const)
+                : ("gray" as const);
 
           return (
             <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -287,10 +323,15 @@ export default function Page() {
                     .map((other) => ({ other, days: overlap(name, other) }))
                     .sort((a, b) => b.days - a.days);
                   return (
-                    <div key={name} className="flex items-start gap-4 px-6 py-4">
+                    <div
+                      key={name}
+                      className="flex items-start gap-4 px-6 py-4"
+                    >
                       <div className="flex items-center gap-2 w-28 flex-shrink-0 pt-0.5">
                         <TeamAvatar name={name} size="s" />
-                        <span className="type-body-2 text-foreground">{name}</span>
+                        <span className="type-body-2 text-foreground">
+                          {name}
+                        </span>
                       </div>
                       <div className="flex gap-2 flex-wrap">
                         {others.map(({ other, days }) => (
@@ -299,7 +340,9 @@ export default function Page() {
                             className="flex items-center gap-1.5 bg-muted rounded-xl px-2.5 py-1.5"
                           >
                             <TeamAvatar name={other} size="xxs" />
-                            <span className="type-caption text-foreground">{other}</span>
+                            <span className="type-caption text-foreground">
+                              {other}
+                            </span>
                             <Tag
                               text={`${days} วัน`}
                               variant={tagVariant(days)}
@@ -325,12 +368,15 @@ export default function Page() {
               "WFH ได้วันจันทร์ อังคาร พฤหัส หรือศุกร์ (ห้าม WFH วันพุธ)",
               "ห้าม WFH วันจันทร์คู่กับศุกร์ในสัปดาห์เดียวกัน",
               "แต่ละคนได้ WFH สูงสุด 2 วันต่อสัปดาห์",
-              "สุ่มแบบ balanced เพื่อให้แต่ละวันมีคนเข้าออฟฟิศพอๆกัน",
-              "Yim ล็อควัน WFH อังคารและพฤหัสทุกสัปดาห์",
+              "ทุกวันที่ WFH ได้จะมีคนเข้าออฟฟิศ 4 คนพอดี",
+              "แต่ละ combo วัน WFH ถูกใช้ไม่เกิน 2 คน เพื่อให้กระจาย",
+              "Yim ล็อควัน WFH อังคารและศุกร์ทุกสัปดาห์",
             ].map((rule) => (
               <li key={rule} className="flex items-start gap-2">
                 <span className="type-body-2 text-muted-foreground">•</span>
-                <span className="type-body-2 text-muted-foreground">{rule}</span>
+                <span className="type-body-2 text-muted-foreground">
+                  {rule}
+                </span>
               </li>
             ))}
           </ul>
@@ -339,7 +385,12 @@ export default function Page() {
 
       {/* Sticky bottom bar — mobile only */}
       <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-card border-t border-border px-6 py-4">
-        <Button variant="primary" size="xl" onClick={openModal} className="w-full">
+        <Button
+          variant="primary"
+          size="xl"
+          onClick={openModal}
+          className="w-full"
+        >
           สุ่มตาราง WFH
         </Button>
       </div>
@@ -350,7 +401,6 @@ export default function Page() {
       {(() => {
         const body = (
           <div className="flex flex-col gap-4">
-
             {/* ── State 1: Empty ── */}
             {!isLoading && !preview && (
               <div className="bg-muted rounded-2xl px-4 py-8 flex flex-col items-center gap-2">
@@ -358,7 +408,9 @@ export default function Page() {
                   พร้อมสุ่มตาราง?
                 </p>
                 <p className="type-body-2 text-muted-foreground text-center">
-                  ระบบจะจัด WFH ให้ทีม 8 คน<br/>แบบ balanced ตามกฎที่ตั้งไว้
+                  ระบบจะจัด WFH ให้ทีม 8 คน
+                  <br />
+                  แบบ balanced ตามกฎที่ตั้งไว้
                 </p>
               </div>
             )}
@@ -382,7 +434,7 @@ export default function Page() {
                 <div className="flex gap-2">
                   {WEEKDAYS.filter((d) => d.allowWfh).map((day) => {
                     const wfh = TEAM_NAMES.filter((n) =>
-                      preview[n]?.includes(day.id)
+                      preview[n]?.includes(day.id),
                     ).length;
                     const office = TEAM_NAMES.length - wfh;
                     return (
@@ -393,7 +445,9 @@ export default function Page() {
                         <p className="type-caption text-muted-foreground">
                           {day.label}
                         </p>
-                        <p className="type-subtitle-1 text-foreground">{office}</p>
+                        <p className="type-subtitle-1 text-foreground">
+                          {office}
+                        </p>
                         <p className="type-caption text-muted-foreground">คน</p>
                       </div>
                     );
@@ -414,7 +468,9 @@ export default function Page() {
                         <div className="flex items-center gap-3">
                           <TeamAvatar name={name} size="m" />
                           <div>
-                            <p className="type-body-2 text-foreground">{name}</p>
+                            <p className="type-body-2 text-foreground">
+                              {name}
+                            </p>
                             {LOCKED_WFH[name] && (
                               <p className="type-caption text-muted-foreground">
                                 ล็อควัน
@@ -427,7 +483,9 @@ export default function Page() {
                             wfhDays.map((d) => (
                               <Tag
                                 key={d}
-                                text={WEEKDAYS.find((w) => w.id === d)?.label ?? d}
+                                text={
+                                  WEEKDAYS.find((w) => w.id === d)?.label ?? d
+                                }
                                 variant={comboVariant(wfhDays)}
                                 size="large"
                               />
@@ -440,6 +498,11 @@ export default function Page() {
                     );
                   })}
                 </div>
+
+                <Alert
+                  status="warning"
+                  message="ควรกดยืนยันเฉพาะเมื่อต้องการเปลี่ยนตารางรอบเดือนเท่านั้น"
+                />
               </>
             )}
 
