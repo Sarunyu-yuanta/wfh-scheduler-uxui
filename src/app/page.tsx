@@ -155,7 +155,7 @@ export default function Page() {
         </div>
 
         {/* Day summary cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="flex gap-3 overflow-x-auto pb-1 -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-5 md:overflow-visible mb-6">
           {days.map((day) => {
             const wfhMembers = day.allowWfh
               ? TEAM_NAMES.filter((n) => schedule[n]?.includes(day.id))
@@ -172,41 +172,44 @@ export default function Page() {
             return (
               <div
                 key={day.id}
-                className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3"
+                className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 shrink-0 min-w-[180px] md:min-w-0 md:shrink"
               >
                 <p className="type-subtitle-1 text-foreground">{day.label}</p>
 
-                {/* Office group */}
-                <div className="flex flex-col gap-1">
-                  <p className="type-caption text-muted-foreground">
-                    ออฟฟิศ {officeMembers.length} คน
-                  </p>
-                  <AvatarStack
-                    items={toItems(officeMembers)}
-                    size="large"
-                    max={8}
-                  />
-                </div>
-
-                {/* WFH group */}
-                {day.allowWfh ? (
-                  <div className="flex flex-col gap-1 pt-2 border-t border-divider">
+                {/* Office + WFH groups — flex-row on mobile, flex-col on desktop */}
+                <div className="flex flex-row md:flex-col gap-3">
+                  {/* Office group */}
+                  <div className="flex flex-col gap-1 flex-1">
                     <p className="type-caption text-muted-foreground">
-                      WFH {wfhMembers.length} คน
+                      ออฟฟิศ {officeMembers.length} คน
                     </p>
-                    {wfhMembers.length > 0 ? (
-                      <AvatarStack
-                        items={toItems(wfhMembers)}
-                        size="large"
-                        max={8}
-                      />
-                    ) : (
-                      <p className="type-caption text-muted-foreground">—</p>
-                    )}
+                    <AvatarStack
+                      items={toItems(officeMembers)}
+                      size="large"
+                      max={8}
+                    />
                   </div>
-                ) : (
-                  <Tag text="ห้าม WFH" variant="gray" size="small" />
-                )}
+
+                  {/* WFH group */}
+                  {day.allowWfh ? (
+                    <div className="flex flex-col gap-1 flex-1 pl-3 border-l md:pl-0 md:border-l-0 md:pt-2 md:border-t border-divider">
+                      <p className="type-caption text-muted-foreground">
+                        WFH {wfhMembers.length} คน
+                      </p>
+                      {wfhMembers.length > 0 ? (
+                        <AvatarStack
+                          items={toItems(wfhMembers)}
+                          size="large"
+                          max={8}
+                        />
+                      ) : (
+                        <p className="type-caption text-muted-foreground">—</p>
+                      )}
+                    </div>
+                  ) : (
+                    <Tag text="ห้าม WFH" variant="gray" size="small" />
+                  )}
+                </div>
               </div>
             );
           })}
@@ -220,7 +223,7 @@ export default function Page() {
             <Table className="table-fixed w-full">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell sortable={false} className="w-48">
+                  <TableHeaderCell sortable={false} className="w-48" fixed="left" fixedShadow="right">
                     พนักงาน
                   </TableHeaderCell>
                   {days.map((day) => (
@@ -237,7 +240,7 @@ export default function Page() {
               <TableBody>
                 {TEAM_NAMES.map((name) => (
                   <TableRow key={name}>
-                    <TableCell>
+                    <TableCell fixed="left" fixedShadow="right">
                       <div className="flex items-center gap-3">
                         <TeamAvatar name={name} size="m" />
                         <span className="type-body-2 text-foreground">
