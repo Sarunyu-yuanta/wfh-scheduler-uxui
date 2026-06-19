@@ -290,10 +290,6 @@ export default function Page() {
             <CheckCircleIcon size={20} weight="fill" className="text-border opacity-20" />
             <span className="type-caption text-muted-foreground">เข้าออฟฟิศ</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Tag text="ล็อควัน" variant="yellow" size="small" />
-            <span className="type-caption text-muted-foreground">วัน WFH กำหนดตายตัว</span>
-          </div>
         </div>
 
         {/* Co-presence section */}
