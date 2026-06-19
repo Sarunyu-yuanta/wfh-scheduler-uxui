@@ -20,7 +20,19 @@ import {
   TableHeaderCell,
   TableCell,
 } from "@sarunyu/system-one";
-import type { ToastProps } from "@sarunyu/system-one";
+import type { ToastProps, TagVariant } from "@sarunyu/system-one";
+
+// Map each WFH combo to a distinct color — same combo = same color across all rows
+const COMBO_COLORS: Record<string, TagVariant> = {
+  "mon-tue": "blue",
+  "mon-thu": "green",
+  "tue-thu": "yellow",
+  "fri-tue": "lime",
+  "fri-thu": "red",
+};
+function comboVariant(days: string[]): TagVariant {
+  return COMBO_COLORS[[...days].sort().join("-")] ?? "gray";
+}
 import {
   type DayId,
   type Schedule,
@@ -326,7 +338,7 @@ export default function Page() {
       </div>
 
       {/* Sticky bottom bar — mobile only */}
-      <div className="fixed bottom-0 left-0 right-0 sm:hidden bg-card border-t border-border px-6 py-4">
+      <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-card border-t border-border px-6 py-4">
         <Button variant="primary" size="xl" onClick={openModal} className="w-full">
           สุ่มตาราง WFH
         </Button>
@@ -416,7 +428,7 @@ export default function Page() {
                               <Tag
                                 key={d}
                                 text={WEEKDAYS.find((w) => w.id === d)?.label ?? d}
-                                variant="green"
+                                variant={comboVariant(wfhDays)}
                                 size="large"
                               />
                             ))
