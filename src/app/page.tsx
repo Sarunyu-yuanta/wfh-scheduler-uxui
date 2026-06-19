@@ -217,13 +217,18 @@ export default function Page() {
 
         {/* Schedule table */}
         <div className="border-t border-border mt-10 mb-6" />
-        <p className="type-h5 text-foreground mb-4">Office Scheduler</p>
+        <p className="type-h5 text-foreground mb-4">ตาราง WFH</p>
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <Table className="table-fixed w-full">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell sortable={false} className="w-34" fixed="left" fixedShadow="right">
+                  <TableHeaderCell
+                    sortable={false}
+                    className="w-34"
+                    fixed="left"
+                    fixedShadow="right"
+                  >
                     พนักงาน
                   </TableHeaderCell>
                   {days.map((day) => (
@@ -283,12 +288,24 @@ export default function Page() {
         {/* Legend */}
         <div className="flex flex-wrap gap-6 mt-6">
           <div className="flex items-center gap-2">
-            <CheckCircleIcon size={20} weight="fill" className="text-primary-action" />
-            <span className="type-caption text-muted-foreground">Work From Home</span>
+            <CheckCircleIcon
+              size={20}
+              weight="fill"
+              className="text-primary-action"
+            />
+            <span className="type-caption text-muted-foreground">
+              Work From Home
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircleIcon size={20} weight="fill" className="text-border opacity-20" />
-            <span className="type-caption text-muted-foreground">เข้าออฟฟิศ</span>
+            <CheckCircleIcon
+              size={20}
+              weight="fill"
+              className="text-border opacity-20"
+            />
+            <span className="type-caption text-muted-foreground">
+              เข้าออฟฟิศ
+            </span>
           </div>
         </div>
 
@@ -314,14 +331,17 @@ export default function Page() {
             <div className="bg-card border border-border rounded-2xl overflow-hidden">
               <div className="flex flex-col divide-y divide-divider">
                 {TEAM_NAMES.map((name) => {
-                  const others = TEAM_NAMES.filter((n) => n !== name)
-                    .map((other) => ({ other, days: overlap(name, other) }));
+                  const others = TEAM_NAMES.filter((n) => n !== name).map(
+                    (other) => ({ other, days: overlap(name, other) }),
+                  );
 
                   // Group by day count descending
                   const grouped = [3, 2, 1, 0]
                     .map((d) => ({
                       days: d,
-                      members: others.filter((o) => o.days === d).map((o) => o.other),
+                      members: others
+                        .filter((o) => o.days === d)
+                        .map((o) => o.other),
                     }))
                     .filter((g) => g.members.length > 0);
 
@@ -333,10 +353,15 @@ export default function Page() {
                     }));
 
                   return (
-                    <div key={name} className="flex items-start gap-4 px-6 py-4">
+                    <div
+                      key={name}
+                      className="flex items-start gap-4 px-6 py-4"
+                    >
                       <div className="flex items-center gap-2 w-24 shrink-0 pt-1">
                         <TeamAvatar name={name} size="l" />
-                        <span className="type-body-2 text-foreground">{name}</span>
+                        <span className="type-body-2 text-foreground">
+                          {name}
+                        </span>
                       </div>
                       <div className="flex flex-col gap-3 ml-auto">
                         {grouped.map(({ days, members }) => (
@@ -346,7 +371,11 @@ export default function Page() {
                               variant={tagVariant(days)}
                               size="large"
                             />
-                            <AvatarStack items={toItems(members)} size="large" max={8} />
+                            <AvatarStack
+                              items={toItems(members)}
+                              size="large"
+                              max={8}
+                            />
                           </div>
                         ))}
                       </div>
@@ -369,7 +398,6 @@ export default function Page() {
               "แต่ละคนได้ WFH สูงสุด 2 วันต่อสัปดาห์",
               "ทุกวันที่ WFH ได้จะมีคนเข้าออฟฟิศ 4 คนพอดี",
               "แต่ละ combo วัน WFH ถูกใช้ไม่เกิน 2 คน เพื่อให้กระจาย",
-              "Yim ล็อควัน WFH อังคารและศุกร์ทุกสัปดาห์",
             ].map((rule) => (
               <li key={rule} className="flex items-start gap-2">
                 <span className="type-body-2 text-muted-foreground">•</span>

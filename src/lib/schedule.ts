@@ -2,7 +2,7 @@ export type DayId = "mon" | "tue" | "wed" | "thu" | "fri";
 export type Schedule = Record<string, DayId[]>;
 
 export const TEAM_NAMES = ["Yim", "Art", "Kes", "Khim", "Nook", "Few", "Max", "Yok"];
-export const LOCKED_WFH: Record<string, DayId[]> = { Yim: ["tue", "fri"] };
+export const LOCKED_WFH: Record<string, DayId[]> = {};
 
 export const WEEKDAYS: { id: DayId; label: string; short: string; allowWfh: boolean }[] = [
   { id: "mon", label: "จันทร์", short: "จัน", allowWfh: true },
