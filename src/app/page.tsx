@@ -192,7 +192,7 @@ export default function Page() {
 
                   {/* WFH group */}
                   {day.allowWfh ? (
-                    <div className="flex flex-col gap-1 flex-1 pl-3 border-l md:pl-0 md:border-l-0 md:pt-2 md:border-t border-divider">
+                    <div className="flex flex-col gap-1 flex-1 pl-3 md:pl-0 md:pt-2">
                       <p className="type-caption text-muted-foreground">
                         WFH {wfhMembers.length} คน
                       </p>
