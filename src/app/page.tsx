@@ -320,7 +320,7 @@ export default function Page() {
                   return (
                     <div
                       key={name}
-                      className="flex flex-col gap-3 px-6 py-4"
+                      className="flex flex-col gap-4 px-6 py-5"
                     >
                       <div className="flex items-center gap-2">
                         <TeamAvatar name={name} size="m" />
