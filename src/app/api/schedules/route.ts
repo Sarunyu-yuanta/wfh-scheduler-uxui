@@ -55,11 +55,19 @@ export async function POST(req: Request) {
     await ensureTable();
     const sql = getSql();
 
+    // Update all weeks in the same month
+    await sql`
+      UPDATE schedule_weeks
+      SET schedule = ${JSON.stringify(schedule)}, saved_at = now()
+      WHERE week_start >= date_trunc('month', ${weekStart}::date)
+        AND week_start < date_trunc('month', ${weekStart}::date) + INTERVAL '1 month'
+    `;
+
+    // Ensure current week exists (if not seeded yet)
     await sql`
       INSERT INTO schedule_weeks (week_start, schedule)
       VALUES (${weekStart}, ${JSON.stringify(schedule)})
-      ON CONFLICT (week_start)
-      DO UPDATE SET schedule = EXCLUDED.schedule, saved_at = now()
+      ON CONFLICT (week_start) DO NOTHING
     `;
 
     // Keep current month + previous month only
