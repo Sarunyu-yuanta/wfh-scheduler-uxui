@@ -315,34 +315,38 @@ export default function Page() {
               <div className="flex flex-col divide-y divide-divider">
                 {TEAM_NAMES.map((name) => {
                   const others = TEAM_NAMES.filter((n) => n !== name)
-                    .map((other) => ({ other, days: overlap(name, other) }))
-                    .sort((a, b) => b.days - a.days);
+                    .map((other) => ({ other, days: overlap(name, other) }));
+
+                  // Group by day count descending
+                  const grouped = [3, 2, 1, 0]
+                    .map((d) => ({
+                      days: d,
+                      members: others.filter((o) => o.days === d).map((o) => o.other),
+                    }))
+                    .filter((g) => g.members.length > 0);
+
+                  const toItems = (names: string[]) =>
+                    names.map((n) => ({
+                      src: `/avatars/${n.toLowerCase()}.jpeg`,
+                      alt: n,
+                      initials: n[0],
+                    }));
+
                   return (
-                    <div
-                      key={name}
-                      className="flex flex-col gap-4 px-6 py-5"
-                    >
+                    <div key={name} className="flex flex-col gap-4 px-6 py-5">
                       <div className="flex items-center gap-2">
                         <TeamAvatar name={name} size="m" />
-                        <span className="type-body-2 text-foreground">
-                          {name}
-                        </span>
+                        <span className="type-body-2 text-foreground">{name}</span>
                       </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {others.map(({ other, days }) => (
-                          <div
-                            key={other}
-                            className="flex items-center gap-1.5 bg-muted rounded-xl px-2.5 py-1.5"
-                          >
-                            <TeamAvatar name={other} size="xs" />
-                            <span className="type-caption text-foreground">
-                              {other}
-                            </span>
+                      <div className="flex flex-col gap-3">
+                        {grouped.map(({ days, members }) => (
+                          <div key={days} className="flex items-center gap-3">
                             <Tag
                               text={`${days} วัน`}
                               variant={tagVariant(days)}
                               size="small"
                             />
+                            <AvatarStack items={toItems(members)} size="large" max={8} />
                           </div>
                         ))}
                       </div>
