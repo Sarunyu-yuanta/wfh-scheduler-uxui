@@ -1,0 +1,7 @@
+@import "@sarunyu/system-one/styles.css";
+@import "tailwindcss";
+
+/* Force center-align content in day column headers */
+.th-day-center > div {
+  justify-content: center !important;
+}
