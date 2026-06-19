@@ -320,10 +320,10 @@ export default function Page() {
                   return (
                     <div
                       key={name}
-                      className="flex items-start gap-4 px-6 py-4"
+                      className="flex flex-col gap-3 px-6 py-4"
                     >
-                      <div className="flex items-center gap-2 w-28 flex-shrink-0 pt-0.5">
-                        <TeamAvatar name={name} size="s" />
+                      <div className="flex items-center gap-2">
+                        <TeamAvatar name={name} size="m" />
                         <span className="type-body-2 text-foreground">
                           {name}
                         </span>
@@ -334,7 +334,7 @@ export default function Page() {
                             key={other}
                             className="flex items-center gap-1.5 bg-muted rounded-xl px-2.5 py-1.5"
                           >
-                            <TeamAvatar name={other} size="xxs" />
+                            <TeamAvatar name={other} size="xs" />
                             <span className="type-caption text-foreground">
                               {other}
                             </span>
