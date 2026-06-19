@@ -45,10 +45,11 @@ export default function Page() {
 
   useEffect(() => {
     fetch("/api/schedules")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((all: Record<string, Schedule>) =>
         setSchedule(all[weekStart] ?? SEED_SCHEDULE)
-      );
+      )
+      .catch(() => setSchedule(SEED_SCHEDULE));
   }, [weekStart]);
 
   // Animate progress bar while loading

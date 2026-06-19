@@ -27,8 +27,9 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetch("/api/schedules")
-      .then((r) => r.json())
-      .then((data: Record<string, Schedule>) => setAllWeeks(data));
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data: Record<string, Schedule>) => setAllWeeks(data))
+      .catch(console.error);
   }, []);
 
   const months = groupWeeksByMonth(Object.keys(allWeeks));
