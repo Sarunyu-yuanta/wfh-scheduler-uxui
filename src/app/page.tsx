@@ -223,7 +223,7 @@ export default function Page() {
             <Table className="table-fixed w-full">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell sortable={false} className="w-32" fixed="left" fixedShadow="right">
+                  <TableHeaderCell sortable={false} className="w-40" fixed="left" fixedShadow="right">
                     พนักงาน
                   </TableHeaderCell>
                   {days.map((day) => (
