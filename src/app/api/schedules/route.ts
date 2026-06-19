@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql, ensureTable } from "@/lib/db";
+import { getSql, ensureTable } from "@/lib/db";
 import { SEED_WEEK_STARTS, SEED_SCHEDULE } from "@/lib/schedule";
 
 function toMap(rows: Record<string, unknown>[]) {
@@ -10,6 +10,7 @@ function toMap(rows: Record<string, unknown>[]) {
 
 export async function GET() {
   await ensureTable();
+  const sql = getSql();
 
   const rows = await sql`
     SELECT week_start::text, schedule
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
   };
 
   await ensureTable();
+  const sql = getSql();
 
   await sql`
     INSERT INTO schedule_weeks (week_start, schedule)
