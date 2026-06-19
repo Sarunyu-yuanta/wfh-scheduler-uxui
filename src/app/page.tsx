@@ -333,14 +333,14 @@ export default function Page() {
                     }));
 
                   return (
-                    <div key={name} className="flex flex-col gap-4 px-6 py-5">
-                      <div className="flex items-center gap-2">
+                    <div key={name} className="flex items-center gap-4 px-6 py-4">
+                      <div className="flex items-center gap-2 w-24 shrink-0">
                         <TeamAvatar name={name} size="m" />
                         <span className="type-body-2 text-foreground">{name}</span>
                       </div>
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-wrap gap-4">
                         {grouped.map(({ days, members }) => (
-                          <div key={days} className="flex items-center gap-3">
+                          <div key={days} className="flex items-center gap-2">
                             <Tag
                               text={`${days} วัน`}
                               variant={tagVariant(days)}
