@@ -338,7 +338,7 @@ export default function Page() {
                         <TeamAvatar name={name} size="m" />
                         <span className="type-body-2 text-foreground">{name}</span>
                       </div>
-                      <div className="flex flex-col gap-3 ml-auto items-end">
+                      <div className="flex flex-col gap-3 ml-auto">
                         {grouped.map(({ days, members }) => (
                           <div key={days} className="flex items-center gap-2">
                             <Tag
