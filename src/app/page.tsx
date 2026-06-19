@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle } from "@phosphor-icons/react";
+import { CheckCircleIcon } from "@phosphor-icons/react";
 import { TeamAvatar } from "./_components/TeamAvatar";
 import {
   Button,
@@ -257,13 +257,13 @@ export default function Page() {
                         <TableCell key={day.id}>
                           <div className="flex justify-center items-center">
                             {isWfh ? (
-                              <CheckCircle
+                              <CheckCircleIcon
                                 size={28}
                                 weight="fill"
                                 className="text-primary-action"
                               />
                             ) : (
-                              <CheckCircle
+                              <CheckCircleIcon
                                 size={28}
                                 weight="fill"
                                 className="text-border opacity-5"
@@ -282,22 +282,18 @@ export default function Page() {
 
         {/* Legend */}
         <div className="flex flex-wrap gap-6 mt-6">
-          {[
-            { label: "Work From Home", variant: "green" as const, text: "WFH" },
-            { label: "เข้าออฟฟิศ", variant: "gray" as const, text: "ออฟฟิศ" },
-            {
-              label: "วัน WFH กำหนดตายตัว",
-              variant: "yellow" as const,
-              text: "ล็อควัน",
-            },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
-              <Tag text={item.text} variant={item.variant} size="small" />
-              <span className="type-caption text-muted-foreground">
-                {item.label}
-              </span>
-            </div>
-          ))}
+          <div className="flex items-center gap-2">
+            <CheckCircleIcon size={20} weight="fill" className="text-primary-action" />
+            <span className="type-caption text-muted-foreground">Work From Home</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircleIcon size={20} weight="fill" className="text-border opacity-20" />
+            <span className="type-caption text-muted-foreground">เข้าออฟฟิศ</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Tag text="ล็อควัน" variant="yellow" size="small" />
+            <span className="type-caption text-muted-foreground">วัน WFH กำหนดตายตัว</span>
+          </div>
         </div>
 
         {/* Co-presence section */}
