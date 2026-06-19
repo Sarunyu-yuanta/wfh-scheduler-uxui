@@ -138,7 +138,7 @@ export default function Page() {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="type-h4 text-foreground">เดือนนี้</h1>
+            <h1 className="type-h4 text-foreground">Office Scheduler</h1>
             <p className="type-body-2 text-muted-foreground mt-1">
               {currentPeriodLabel()}
             </p>
@@ -217,7 +217,7 @@ export default function Page() {
 
         {/* Schedule table */}
         <div className="border-t border-border mt-10 mb-6" />
-        <p className="type-h5 text-foreground mb-4">ตาราง WFH</p>
+        <p className="type-h5 text-foreground mb-4">Office Day</p>
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <Table className="table-fixed w-full">
