@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { TeamAvatar } from "../_components/TeamAvatar";
 import {
+  Button,
   Tag,
   Table,
   TableHead,
@@ -23,6 +24,8 @@ import {
 
 export default function HistoryPage() {
   const [allWeeks, setAllWeeks] = useState<Record<string, Schedule>>({});
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [restoredMonth, setRestoredMonth] = useState<string | null>(null);
   const thisWeek = currentWeekStart();
 
   useEffect(() => {
@@ -33,6 +36,18 @@ export default function HistoryPage() {
   }, []);
 
   const months = groupWeeksByMonth(Object.keys(allWeeks));
+
+  const restore = async (label: string, schedule: Schedule) => {
+    setRestoring(label);
+    await fetch("/api/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart: thisWeek, schedule }),
+    });
+    setAllWeeks((prev) => ({ ...prev, [thisWeek]: schedule }));
+    setRestoring(null);
+    setRestoredMonth(label);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,16 +64,32 @@ export default function HistoryPage() {
             ? thisWeek
             : weeks[weeks.length - 1];
           const schedule = allWeeks[representativeWeek] ?? {};
+          const justRestored = restoredMonth === label;
 
           return (
             <div key={label} className="mb-10">
               <div className="bg-card border border-border rounded-2xl overflow-hidden">
 
                 {/* Month header */}
-                <div className="px-6 pt-6 pb-4 flex items-center gap-3">
-                  <p className="type-h5 text-foreground">{label}</p>
-                  {isCurrentMonth && (
-                    <Tag text="เดือนปัจจุบัน" variant="blue" size="small" />
+                <div className="px-6 pt-6 pb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <p className="type-h5 text-foreground">{label}</p>
+                    {isCurrentMonth && (
+                      <Tag text="เดือนปัจจุบัน" variant="blue" size="small" />
+                    )}
+                    {justRestored && (
+                      <Tag text="นำกลับมาใช้แล้ว" variant="green" size="small" />
+                    )}
+                  </div>
+                  {!isCurrentMonth && (
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={() => restore(label, schedule)}
+                      disabled={restoring === label}
+                    >
+                      {restoring === label ? "กำลังนำกลับ..." : "นำกลับมาใช้เดือนนี้"}
+                    </Button>
                   )}
                 </div>
 
