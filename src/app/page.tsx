@@ -335,7 +335,7 @@ export default function Page() {
                   return (
                     <div key={name} className="flex items-start gap-4 px-6 py-4">
                       <div className="flex items-center gap-2 w-24 shrink-0 pt-1">
-                        <TeamAvatar name={name} size="m" />
+                        <TeamAvatar name={name} size="l" />
                         <span className="type-body-2 text-foreground">{name}</span>
                       </div>
                       <div className="flex flex-col gap-3 ml-auto">
