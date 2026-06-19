@@ -344,7 +344,7 @@ export default function Page() {
                             <Tag
                               text={`${days} วัน`}
                               variant={tagVariant(days)}
-                              size="small"
+                              size="large"
                             />
                             <AvatarStack items={toItems(members)} size="large" max={8} />
                           </div>
