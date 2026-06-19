@@ -172,30 +172,3 @@ export function groupWeeksByMonth(weekStarts: string[]): { label: string; weeks:
   return Array.from(map.entries()).map(([label, weeks]) => ({ label, weeks }));
 }
 
-// ─── localStorage ─────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "wfh-weeks-v2";
-
-function seedInitial(): Record<string, Schedule> {
-  const data: Record<string, Schedule> = {};
-  for (const ws of SEED_WEEK_STARTS) data[ws] = { ...SEED_SCHEDULE };
-  return data;
-}
-
-export function loadAllWeeks(): Record<string, Schedule> {
-  if (typeof window === "undefined") return seedInitial();
-  try {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if (s) return JSON.parse(s);
-  } catch {}
-  const data = seedInitial();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  return data;
-}
-
-export function saveWeek(weekStart: string, schedule: Schedule): void {
-  if (typeof window === "undefined") return;
-  const all = loadAllWeeks();
-  all[weekStart] = schedule;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-}

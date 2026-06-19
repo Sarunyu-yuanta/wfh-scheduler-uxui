@@ -29,8 +29,6 @@ import {
   weekDayLabels,
   currentWeekStart,
   currentPeriodLabel,
-  loadAllWeeks,
-  saveWeek,
   SEED_SCHEDULE,
 } from "@/lib/schedule";
 
@@ -45,10 +43,12 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
 
-  // Load from localStorage on mount
   useEffect(() => {
-    const all = loadAllWeeks();
-    setSchedule(all[weekStart] ?? SEED_SCHEDULE);
+    fetch("/api/schedules")
+      .then((r) => r.json())
+      .then((all: Record<string, Schedule>) =>
+        setSchedule(all[weekStart] ?? SEED_SCHEDULE)
+      );
   }, [weekStart]);
 
   // Animate progress bar while loading
@@ -78,9 +78,13 @@ export default function Page() {
     }, 700);
   }, []);
 
-  const confirm = useCallback(() => {
+  const confirm = useCallback(async () => {
     if (!preview) return;
-    saveWeek(weekStart, preview);
+    await fetch("/api/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart, schedule: preview }),
+    });
     setSchedule(preview);
     setModalOpen(false);
   }, [weekStart, preview]);

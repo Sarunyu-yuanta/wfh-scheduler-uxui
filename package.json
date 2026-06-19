@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@sarunyu/system-one": "latest",
     "next": "15.3.3",
     "react": "^19.0.0",

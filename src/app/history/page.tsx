@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { TeamAvatar } from "../_components/TeamAvatar";
 import {
-  Avatar,
   Tag,
   Table,
   TableHead,
@@ -15,64 +14,50 @@ import {
 } from "@sarunyu/system-one";
 import {
   type Schedule,
-  type Round,
   TEAM_NAMES,
   LOCKED_WFH,
   WEEKDAYS,
-  ROUNDS,
-  groupWeeksByRound,
-  loadAllWeeks,
+  groupWeeksByMonth,
   currentWeekStart,
 } from "@/lib/schedule";
-
-function roundDateLabel(round: Round): string {
-  const start = new Date(round.startDate + "T00:00:00");
-  const end = new Date(round.endDate + "T00:00:00");
-  const s = start.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
-  const e = end.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
-  return `${s} – ${e}`;
-}
 
 export default function HistoryPage() {
   const [allWeeks, setAllWeeks] = useState<Record<string, Schedule>>({});
   const thisWeek = currentWeekStart();
 
   useEffect(() => {
-    const all = loadAllWeeks();
-    const maxRoundEnd = ROUNDS[ROUNDS.length - 1]?.endDate ?? "";
-    const filtered = Object.fromEntries(
-      Object.entries(all).filter(([ws]) => ws <= maxRoundEnd)
-    );
-    setAllWeeks(filtered);
+    fetch("/api/schedules")
+      .then((r) => r.json())
+      .then((data: Record<string, Schedule>) => setAllWeeks(data));
   }, []);
 
-  const rounds = groupWeeksByRound(Object.keys(allWeeks));
+  const months = groupWeeksByMonth(Object.keys(allWeeks));
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1024px] mx-auto px-6 pt-6 pb-8">
         <h1 className="type-h4 text-foreground mb-8">ประวัติรายเดือน</h1>
 
-        {rounds.length === 0 && (
+        {months.length === 0 && (
           <p className="type-body-2 text-muted-foreground">ยังไม่มีข้อมูล</p>
         )}
 
-        {rounds.map(({ label, weeks }) => {
-          const round = ROUNDS.find((r) => r.label === label)!;
-          const representativeWeek = weeks.includes(thisWeek) ? thisWeek : weeks[0];
+        {months.map(({ label, weeks }) => {
+          const isCurrentMonth = weeks.includes(thisWeek);
+          const representativeWeek = isCurrentMonth
+            ? thisWeek
+            : weeks[weeks.length - 1];
           const schedule = allWeeks[representativeWeek] ?? {};
-          const isCurrentRound = weeks.includes(thisWeek);
 
           return (
             <div key={label} className="mb-10">
-              {/* Single card for the round */}
               <div className="bg-card border border-border rounded-2xl overflow-hidden">
 
-                {/* Round header */}
+                {/* Month header */}
                 <div className="px-6 pt-6 pb-4 flex items-center gap-3">
-                  <p className="type-h5 text-foreground">{roundDateLabel(round)}</p>
-                  {isCurrentRound && (
-                    <Tag text="รอบปัจจุบัน" variant="blue" size="small" />
+                  <p className="type-h5 text-foreground">{label}</p>
+                  {isCurrentMonth && (
+                    <Tag text="เดือนปัจจุบัน" variant="blue" size="small" />
                   )}
                 </div>
 
