@@ -68,27 +68,37 @@ export function generateSchedule(): Schedule {
   for (const d of eligible) remaining[d] = targetPerDay - lockedCnt[d];
 
   const nonLocked = TEAM_NAMES.filter((n) => !LOCKED_WFH[n]);
-
-  // Find all combo count distributions that hit remaining targets exactly
-  // VALID_COMBOS order: [mon,tue]=x0, [mon,thu]=x1, [tue,thu]=x2, [tue,fri]=x3, [thu,fri]=x4
-  const distributions: number[][] = [];
   const n = nonLocked.length;
-  for (let x0 = 0; x0 <= n; x0++) {
-    for (let x1 = 0; x1 <= n - x0; x1++) {
-      for (let x2 = 0; x2 <= n - x0 - x1; x2++) {
-        for (let x3 = 0; x3 <= n - x0 - x1 - x2; x3++) {
-          const x4 = n - x0 - x1 - x2 - x3;
-          if (
-            x0 + x1 === remaining.mon &&
-            x0 + x2 + x3 === remaining.tue &&
-            x1 + x2 + x4 === remaining.thu &&
-            x3 + x4 === remaining.fri
-          ) {
-            distributions.push([x0, x1, x2, x3, x4]);
+
+  // Find balanced distributions with a max-per-combo cap for diversity.
+  // Try cap=2 first (most diverse), fall back to looser caps if needed.
+  function findDistributions(cap: number): number[][] {
+    const results: number[][] = [];
+    for (let x0 = 0; x0 <= cap; x0++) {
+      for (let x1 = 0; x1 <= cap; x1++) {
+        for (let x2 = 0; x2 <= cap; x2++) {
+          for (let x3 = 0; x3 <= cap; x3++) {
+            const x4 = n - x0 - x1 - x2 - x3;
+            if (x4 < 0 || x4 > cap) continue;
+            if (
+              x0 + x1 === remaining.mon &&
+              x0 + x2 + x3 === remaining.tue &&
+              x1 + x2 + x4 === remaining.thu &&
+              x3 + x4 === remaining.fri
+            ) {
+              results.push([x0, x1, x2, x3, x4]);
+            }
           }
         }
       }
     }
+    return results;
+  }
+
+  let distributions: number[][] = [];
+  for (const cap of [2, 3, n]) {
+    distributions = findDistributions(cap);
+    if (distributions.length > 0) break;
   }
 
   let comboPool: DayId[][];
