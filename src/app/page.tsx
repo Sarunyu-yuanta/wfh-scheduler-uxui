@@ -2,18 +2,22 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircleIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, HouseIcon } from "@phosphor-icons/react";
 import { TeamAvatar, displayName, avatarStackItem } from "./_components/TeamAvatar";
 import {
   Button,
   Avatar,
   AvatarStack,
   Tag,
+  Chip,
   Alert,
   Modal,
   BottomSheet,
   LinearProgress,
   Toaster,
+  Toggle,
+  Checkbox,
+  Input,
   useIsMobile,
   Table,
   TableHead,
@@ -36,12 +40,14 @@ const COMBO_COLORS: Record<string, TagVariant> = {
 function comboVariant(days: string[]): TagVariant {
   return COMBO_COLORS[[...days].sort().join("-")] ?? "gray";
 }
+
 import {
   type DayId,
   type Schedule,
   TEAM_NAMES,
   LOCKED_WFH,
   WEEKDAYS,
+  VALID_COMBOS,
   generateSchedule,
   weekDayLabels,
   currentWeekStart,
@@ -75,13 +81,30 @@ function PageContent() {
   const [hoveredTarget, setHoveredTarget] = useState<0 | 1 | null>(null);
   const [preview, setPreview] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [toasts, setToasts] = useState<Array<ToastProps & { id: string }>>([]);
+  const [yimLocked, setYimLocked] = useState(false);
+  const [yimCombo, setYimCombo] = useState<DayId[]>(VALID_COMBOS[0]);
+  const [yimBoxHovered, setYimBoxHovered] = useState(false);
+  const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
+  const [selectedForRoll, setSelectedForRoll] = useState<Set<string>>(
+    new Set(TEAM_NAMES),
+  );
+  const [newMemberName, setNewMemberName] = useState("");
+  const [isAddingMember, setIsAddingMember] = useState(false);
+
+  const yimIncludedInRoll = selectedForRoll.has("Yim");
 
   const nextMonthNotGenerated =
     schedulesLoaded && monthOffset === 1 && !scheduleMap[activeWeekStart];
   const schedule: Schedule =
     scheduleMap[activeWeekStart] ?? (monthOffset === 0 ? SEED_SCHEDULE : {});
+  const rollTargetWeekStart =
+    rollTarget === 0 ? currentWeekStart() : monthWeekStarts(1)[0];
+  const existingForRollTarget: Schedule =
+    scheduleMap[rollTargetWeekStart] ?? (rollTarget === 0 ? SEED_SCHEDULE : {});
 
   const removeToast = useCallback((id: string) => {
     setToasts((t) => t.filter((x) => x.id !== id));
@@ -99,6 +122,53 @@ function PageContent() {
     refreshSchedules();
   }, [refreshSchedules]);
 
+  useEffect(() => {
+    fetch("/api/team")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data: { names: string[] }) => {
+        setTeamNames(data.names);
+        setSelectedForRoll(new Set(data.names));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleRollMember = useCallback((name: string) => {
+    setSelectedForRoll((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const addMember = useCallback(async () => {
+    const name = newMemberName.trim();
+    if (!name) return;
+    setIsAddingMember(true);
+    try {
+      const r = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (r.ok) {
+        const data: { names: string[] } = await r.json();
+        setTeamNames(data.names);
+        setSelectedForRoll((prev) => new Set([...prev, name]));
+        setNewMemberName("");
+      }
+    } finally {
+      setIsAddingMember(false);
+    }
+  }, [newMemberName]);
+
+  // If Yim gets excluded from this roll, locking her combo no longer applies
+  useEffect(() => {
+    if (!yimIncludedInRoll && yimLocked) {
+      setYimLocked(false);
+    }
+  }, [yimIncludedInRoll, yimLocked]);
+
   // Animate progress bar while loading
   useEffect(() => {
     if (!isLoading) return;
@@ -112,61 +182,97 @@ function PageContent() {
   const openModal = useCallback(() => {
     setPreview(null);
     setIsLoading(false);
+    setIsConfirming(false);
     setLoadProgress(0);
     setRollTarget(monthOffset);
+    setYimLocked(false);
+    setYimCombo(VALID_COMBOS[0]);
+    setSelectedForRoll(new Set(teamNames));
+    setNewMemberName("");
     setModalOpen(true);
-  }, [monthOffset]);
+  }, [monthOffset, teamNames]);
 
   const roll = useCallback(() => {
     setIsLoading(true);
     setPreview(null);
+    const names = Array.from(selectedForRoll);
+    const locked: Record<string, DayId[]> =
+      yimLocked && selectedForRoll.has("Yim") ? { Yim: yimCombo } : {};
     setTimeout(() => {
-      setPreview(generateSchedule());
+      setPreview(generateSchedule(names, locked));
       setLoadProgress(100);
       setIsLoading(false);
     }, 700);
-  }, []);
+  }, [selectedForRoll, yimLocked, yimCombo]);
 
   const undo = useCallback(async (offset: 0 | 1) => {
-    const monthKey = monthKeyForOffset(offset);
-    const r = await fetch("/api/schedules/undo", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ monthKey }),
-    });
-    if (r.ok) {
-      await refreshSchedules();
+    setIsUndoing(true);
+    setToasts((t) =>
+      t.map((toast) =>
+        toast.id === "undo-toast"
+          ? {
+              ...toast,
+              message: "กำลังยกเลิก...",
+              actionLabel: undefined,
+              onActionClick: undefined,
+            }
+          : toast,
+      ),
+    );
+    try {
+      const monthKey = monthKeyForOffset(offset);
+      const r = await fetch("/api/schedules/undo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthKey }),
+      });
+      if (r.ok) {
+        await refreshSchedules();
+      }
+      removeToast("undo-toast");
+    } finally {
+      setIsUndoing(false);
     }
-    removeToast("undo-toast");
   }, [removeToast, refreshSchedules]);
 
   const confirm = useCallback(async () => {
     if (!preview) return;
     const offset = rollTarget;
-    await fetch("/api/schedules", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekStarts: monthWeekStarts(offset), schedule: preview }),
-    });
-    await refreshSchedules();
-    setModalOpen(false);
-    setToasts([
-      {
-        id: "undo-toast",
-        message:
-          offset === 0
-            ? "บันทึกตารางใหม่แล้ว"
-            : `บันทึกตารางเดือน ${monthLabelForOffset(1)} แล้ว`,
-        actionLabel: "Undo",
-        status: "success",
-        onActionClick: () => undo(offset),
-        onClose: () => removeToast("undo-toast"),
-      },
-    ]);
-  }, [rollTarget, preview, undo, removeToast, refreshSchedules]);
+    setIsConfirming(true);
+    try {
+      // People left out of this roll keep whatever they already had; only
+      // still-active team members carry forward into the saved schedule.
+      const merged: Schedule = { ...existingForRollTarget, ...preview };
+      const finalSchedule: Schedule = Object.fromEntries(
+        Object.entries(merged).filter(([name]) => teamNames.includes(name)),
+      );
+      await fetch("/api/schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStarts: monthWeekStarts(offset), schedule: finalSchedule }),
+      });
+      await refreshSchedules();
+      setModalOpen(false);
+      setToasts([
+        {
+          id: "undo-toast",
+          message:
+            offset === 0
+              ? "บันทึกตารางใหม่แล้ว"
+              : `บันทึกตารางเดือน ${monthLabelForOffset(1)} แล้ว`,
+          actionLabel: "Undo",
+          status: "success",
+          onActionClick: () => undo(offset),
+          onClose: () => removeToast("undo-toast"),
+        },
+      ]);
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [rollTarget, preview, existingForRollTarget, teamNames, undo, removeToast, refreshSchedules]);
 
   const inOfficeCount = (dayId: DayId) =>
-    TEAM_NAMES.filter((n) => !schedule[n]?.includes(dayId)).length;
+    teamNames.filter((n) => !schedule[n]?.includes(dayId)).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -222,9 +328,9 @@ function PageContent() {
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-5 md:overflow-visible mb-6">
           {days.map((day) => {
             const wfhMembers = day.allowWfh
-              ? TEAM_NAMES.filter((n) => schedule[n]?.includes(day.id))
+              ? teamNames.filter((n) => schedule[n]?.includes(day.id))
               : [];
-            const officeMembers = TEAM_NAMES.filter(
+            const officeMembers = teamNames.filter(
               (n) => !wfhMembers.includes(n),
             );
             const toItems = (names: string[]) => names.map((name) => avatarStackItem(name));
@@ -277,7 +383,22 @@ function PageContent() {
         {/* Schedule table */}
         <div className="border-t border-border mt-10 mb-6" />
         <p className="type-h5 text-foreground mb-4">ตารางเข้าออฟฟิศ</p>
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="relative bg-card border border-border rounded-2xl overflow-hidden">
+          {isUndoing && (
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center gap-2"
+              style={{ backgroundColor: "rgba(255,255,255,0.75)" }}
+            >
+              <div
+                className="h-4 w-4 rounded-full animate-spin"
+                style={{
+                  border: "2px solid rgba(127,127,127,0.3)",
+                  borderTopColor: "rgba(80,80,80,0.9)",
+                }}
+              />
+              <p className="type-body-2 text-foreground">กำลังยกเลิก...</p>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <Table className="table-fixed w-full">
               <TableHead>
@@ -302,7 +423,7 @@ function PageContent() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {TEAM_NAMES.map((name) => (
+                {teamNames.map((name) => (
                   <TableRow key={name}>
                     <TableCell fixed="left" fixedShadow="right">
                       <div className="flex items-center gap-3">
@@ -321,10 +442,10 @@ function PageContent() {
                         <TableCell key={day.id}>
                           <div className="flex justify-center items-center">
                             {isWfh ? (
-                              <CheckCircleIcon
+                              <HouseIcon
                                 size={28}
                                 weight="fill"
-                                className="text-border opacity-5"
+                                className="text-gray-300"
                               />
                             ) : (
                               <CheckCircleIcon
@@ -357,10 +478,10 @@ function PageContent() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircleIcon
+            <HouseIcon
               size={20}
               weight="fill"
-              className="text-border opacity-20"
+              className="text-gray-300"
             />
             <span className="type-caption text-muted-foreground">
               Work From Home
@@ -387,56 +508,54 @@ function PageContent() {
                 : ("gray" as const);
 
           return (
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="flex flex-col divide-y divide-divider">
-                {TEAM_NAMES.map((name) => {
-                  const others = TEAM_NAMES.filter((n) => n !== name).map(
-                    (other) => ({ other, days: overlap(name, other) }),
-                  );
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {teamNames.map((name) => {
+                const others = teamNames.filter((n) => n !== name).map(
+                  (other) => ({ other, days: overlap(name, other) }),
+                );
 
-                  // Group by day count descending
-                  const grouped = [3, 2, 1, 0]
-                    .map((d) => ({
-                      days: d,
-                      members: others
-                        .filter((o) => o.days === d)
-                        .map((o) => o.other),
-                    }))
-                    .filter((g) => g.members.length > 0);
+                // Group by day count descending
+                const grouped = [3, 2, 1, 0]
+                  .map((d) => ({
+                    days: d,
+                    members: others
+                      .filter((o) => o.days === d)
+                      .map((o) => o.other),
+                  }))
+                  .filter((g) => g.members.length > 0);
 
-                  const toItems = (names: string[]) => names.map((n) => avatarStackItem(n));
+                const toItems = (names: string[]) => names.map((n) => avatarStackItem(n));
 
-                  return (
-                    <div
-                      key={name}
-                      className="flex items-start gap-4 px-6 py-4"
-                    >
-                      <div className="flex items-center gap-2 w-24 shrink-0 pt-1">
-                        <TeamAvatar name={name} size="l" />
-                        <span className="type-body-2 text-foreground">
-                          {displayName(name)}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-3 ml-auto">
-                        {grouped.map(({ days, members }) => (
-                          <div key={days} className="flex items-center gap-2">
-                            <Tag
-                              text={`${days} วัน`}
-                              variant={tagVariant(days)}
-                              size="large"
-                            />
-                            <AvatarStack
-                              items={toItems(members)}
-                              size="large"
-                              max={8}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                return (
+                  <div
+                    key={name}
+                    className="bg-card border border-border rounded-xl p-3 flex flex-col gap-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <TeamAvatar name={name} size="s" />
+                      <span className="type-body-2 text-foreground truncate">
+                        {displayName(name)}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex flex-col gap-1.5">
+                      {grouped.map(({ days, members }) => (
+                        <div key={days} className="flex items-center gap-1.5 flex-wrap">
+                          <Tag
+                            text={`${days} วัน`}
+                            variant={tagVariant(days)}
+                            size="small"
+                          />
+                          <AvatarStack
+                            items={toItems(members)}
+                            size="small"
+                            max={5}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })()}
@@ -479,10 +598,11 @@ function PageContent() {
 
       {/* Shared modal body — used in both Modal (desktop) and BottomSheet (mobile) */}
       {(() => {
-        const modalTitle =
-          rollTarget === 0
+        const modalTitle = preview
+          ? rollTarget === 0
             ? "สุ่มตาราง WFH ใหม่ (เดือนนี้)"
-            : `สุ่มตาราง WFH ใหม่ (${monthLabelForOffset(1)})`;
+            : `สุ่มตาราง WFH ใหม่ (${monthLabelForOffset(1)})`
+          : "สุ่มตาราง WFH ใหม่";
         const body = (
           <div className="flex flex-col gap-4">
             {/* ── Target month picker (segmented control) — only before rolling ── */}
@@ -527,17 +647,133 @@ function PageContent() {
               </div>
             )}
 
-            {/* ── State 1: Empty ── */}
+            {/* ── Roster picker: choose who's in this roll, add members ── */}
             {!isLoading && !preview && (
-              <div className="bg-muted rounded-2xl px-4 py-8 flex flex-col items-center gap-2">
-                <p className="type-h5 text-foreground text-center">
-                  พร้อมสุ่มตาราง?
-                </p>
-                <p className="type-body-2 text-muted-foreground text-center">
-                  ระบบจะจัด WFH ให้ทีม 8 คน
-                  <br />
-                  แบบ balanced ตามกฎที่ตั้งไว้
-                </p>
+              <div className="bg-primary-action-light rounded-2xl p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="type-subtitle-1 text-foreground">
+                    เลือกคนที่จะสุ่มตาราง
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="type-caption text-muted-foreground">
+                      {selectedForRoll.size}/{teamNames.length} คน
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedForRoll(
+                          selectedForRoll.size === teamNames.length
+                            ? new Set()
+                            : new Set(teamNames),
+                        )
+                      }
+                      className="type-caption text-primary-action cursor-pointer hover:underline"
+                    >
+                      {selectedForRoll.size === teamNames.length
+                        ? "เลือกออกทั้งหมด"
+                        : "เลือกทั้งหมด"}
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                  <div className="roster-scroll flex flex-col divide-y divide-divider max-h-[212px] overflow-y-auto">
+                    {[...teamNames]
+                      .sort(
+                        (a, b) =>
+                          Number(displayName(a) === "Anonymous") -
+                          Number(displayName(b) === "Anonymous"),
+                      )
+                      .map((name) => (
+                      <div
+                        key={name}
+                        onClick={() => toggleRollMember(name)}
+                        className="w-full px-3 py-2.5 hover:bg-muted transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2 type-body-2 text-foreground">
+                          <TeamAvatar name={name} size="s" />
+                          {displayName(name)}
+                        </span>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedForRoll.has(name)}
+                            onChange={() => toggleRollMember(name)}
+                            ariaLabel={displayName(name)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <Input
+                      value={newMemberName}
+                      onChange={setNewMemberName}
+                      placeholder="ใส่ชื่อคนที่ต้องการเพิ่ม"
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="xl"
+                    onClick={addMember}
+                    disabled={!newMemberName.trim() || isAddingMember}
+                    className="h-12"
+                  >
+                    {isAddingMember ? "กำลังเพิ่ม..." : "เพิ่ม"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Lock a combo for Yim before rolling ── */}
+            {!preview && (
+              <div
+                onMouseEnter={() => setYimBoxHovered(true)}
+                onMouseLeave={() => setYimBoxHovered(false)}
+                style={
+                  !yimLocked && yimBoxHovered && yimIncludedInRoll
+                    ? { borderColor: "rgba(0,0,0,0.35)" }
+                    : undefined
+                }
+                className={`border border-dashed rounded-2xl p-4 flex flex-col gap-3 transition-colors ${
+                  yimLocked ? "border-primary-action" : "border-border"
+                } ${!yimIncludedInRoll ? "opacity-50" : ""}`}
+              >
+                <Toggle
+                  checked={yimLocked}
+                  onChange={setYimLocked}
+                  disabled={!yimIncludedInRoll}
+                  label={
+                    <span className="flex items-center gap-2">
+                      <span className="type-subtitle-1 text-foreground">
+                        ล็อควันให้ Yim
+                      </span>
+                      <Tag text="Optional" variant="gray" size="small" />
+                    </span>
+                  }
+                />
+                {yimLocked && (
+                  <div className="flex flex-wrap gap-2">
+                    {VALID_COMBOS.map((combo) => {
+                      const isSelected =
+                        combo.join(",") === yimCombo.join(",");
+                      return (
+                        <Chip
+                          key={combo.join("-")}
+                          label={combo
+                            .map(
+                              (d) =>
+                                WEEKDAYS.find((w) => w.id === d)?.short ?? d,
+                            )
+                            .join(" + ")}
+                          size="small"
+                          selected={isSelected}
+                          onClick={() => setYimCombo(combo)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -559,10 +795,10 @@ function PageContent() {
                 {/* Day balance — compact chips */}
                 <div className="flex gap-2">
                   {WEEKDAYS.filter((d) => d.allowWfh).map((day) => {
-                    const wfh = TEAM_NAMES.filter((n) =>
-                      preview[n]?.includes(day.id),
+                    const wfh = teamNames.filter((n) =>
+                      (preview[n] ?? existingForRollTarget[n])?.includes(day.id),
                     ).length;
-                    const office = TEAM_NAMES.length - wfh;
+                    const office = teamNames.length - wfh;
                     return (
                       <div
                         key={day.id}
@@ -582,8 +818,9 @@ function PageContent() {
 
                 {/* Person list */}
                 <div className="rounded-2xl overflow-hidden border border-border">
-                  {TEAM_NAMES.map((name, idx) => {
-                    const wfhDays = preview[name] ?? [];
+                  {teamNames.map((name, idx) => {
+                    const wfhDays = preview[name] ?? existingForRollTarget[name] ?? [];
+                    const wasRolled = name in preview;
                     return (
                       <div
                         key={name}
@@ -597,9 +834,14 @@ function PageContent() {
                             <p className="type-body-2 text-foreground">
                               {displayName(name)}
                             </p>
-                            {LOCKED_WFH[name] && (
+                            {(LOCKED_WFH[name] || (name === "Yim" && yimLocked)) && (
                               <p className="type-caption text-muted-foreground">
                                 ล็อควัน
+                              </p>
+                            )}
+                            {!wasRolled && (
+                              <p className="type-caption text-muted-foreground">
+                                ไม่ได้เลือกสุ่มรอบนี้
                               </p>
                             )}
                           </div>
@@ -639,16 +881,26 @@ function PageContent() {
                   variant="primary"
                   size="xl"
                   onClick={roll}
-                  disabled={isLoading}
+                  disabled={isLoading || selectedForRoll.size === 0}
                 >
                   สุ่มตาราง
                 </Button>
               ) : (
                 <>
-                  <Button variant="primary" size="xl" onClick={confirm}>
-                    ยืนยันใช้ตารางนี้
+                  <Button
+                    variant="primary"
+                    size="xl"
+                    onClick={confirm}
+                    disabled={isConfirming}
+                  >
+                    {isConfirming ? "กำลังบันทึก..." : "ยืนยันใช้ตารางนี้"}
                   </Button>
-                  <Button variant="outline" size="xl" onClick={roll}>
+                  <Button
+                    variant="outline"
+                    size="xl"
+                    onClick={roll}
+                    disabled={isConfirming}
+                  >
                     สุ่มตารางอีกครั้ง
                   </Button>
                 </>
@@ -657,6 +909,7 @@ function PageContent() {
                 variant="plain"
                 size="xl"
                 onClick={() => setModalOpen(false)}
+                disabled={isConfirming}
               >
                 ยกเลิก
               </Button>
@@ -689,6 +942,7 @@ function PageContent() {
                 actionLayout="none"
                 title={modalTitle}
                 onClose={() => setModalOpen(false)}
+                className="min-w-[440px]"
               >
                 {body}
               </Modal>

@@ -22,4 +22,10 @@ export async function ensureTable() {
       saved_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS team_members (
+      name        TEXT         PRIMARY KEY,
+      created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+    )
+  `;
 }

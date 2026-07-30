@@ -20,6 +20,43 @@ export function avatarStackItem(name: string, isCurrent = true): AvatarStackItem
   return { src: `/avatars/${name.toLowerCase()}.jpeg`, alt: name, initials: name[0] };
 }
 
+const SIZE_PX: Record<AvatarSize, number> = {
+  xxs: 16,
+  xs: 20,
+  s: 24,
+  m: 32,
+  l: 40,
+  xl: 48,
+  xxl: 52,
+};
+const FONT_PX: Record<AvatarSize, number> = {
+  xxs: 8,
+  xs: 9,
+  s: 10,
+  m: 13,
+  l: 16,
+  xl: 18,
+  xxl: 20,
+};
+
+// People without a photo on file (e.g. freshly added team members) get a
+// 2-letter avatar instead of the design system's single-character fallback.
+function TwoLetterAvatar({ name, size }: { name: string; size: AvatarSize }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full text-white font-bold shrink-0"
+      style={{
+        width: SIZE_PX[size],
+        height: SIZE_PX[size],
+        fontSize: FONT_PX[size],
+        background: "linear-gradient(135deg, #60a5fa, #a78bfa)",
+      }}
+    >
+      {name.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
 const CANDIDATES = (name: string) => [
   `/avatars/${name}.jpg`,
   `/avatars/${name}.jpeg`,
@@ -67,7 +104,7 @@ export function TeamAvatar({
   ) : photoSrc ? (
     <Avatar type="photo" src={photoSrc} alt={name} size={size} />
   ) : (
-    <Avatar type="text" initials={name[0]} size={size} />
+    <TwoLetterAvatar name={name} size={size} />
   );
 
   return (

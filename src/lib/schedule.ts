@@ -12,7 +12,7 @@ export const WEEKDAYS: { id: DayId; label: string; short: string; allowWfh: bool
   { id: "fri", label: "ศุกร์",  short: "ศ",   allowWfh: true },
 ];
 
-const VALID_COMBOS: DayId[][] = [
+export const VALID_COMBOS: DayId[][] = [
   ["mon", "tue"],
   ["mon", "thu"],
   ["tue", "thu"],
@@ -49,26 +49,29 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function generateSchedule(): Schedule {
+export function generateSchedule(
+  names: string[] = TEAM_NAMES,
+  locked: Record<string, DayId[]> = LOCKED_WFH,
+): Schedule {
   const result: Schedule = {};
-  for (const [name, days] of Object.entries(LOCKED_WFH)) {
-    result[name] = [...days];
+  for (const [name, days] of Object.entries(locked)) {
+    if (names.includes(name)) result[name] = [...days];
   }
 
   const eligible: DayId[] = ["mon", "tue", "thu", "fri"];
 
   // WFH counts from locked assignments
   const lockedCnt: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
-  for (const days of Object.values(LOCKED_WFH)) {
-    for (const d of days) lockedCnt[d as DayId]++;
+  for (const name of Object.keys(result)) {
+    for (const d of result[name]) lockedCnt[d as DayId]++;
   }
 
-  // Target: spread total WFH evenly (8 people × 2 days / 4 eligible days = 4 per day)
-  const targetPerDay = Math.round((TEAM_NAMES.length * 2) / eligible.length);
+  // Target: spread total WFH evenly (people × 2 days / 4 eligible days)
+  const targetPerDay = Math.round((names.length * 2) / eligible.length);
   const remaining: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
   for (const d of eligible) remaining[d] = targetPerDay - lockedCnt[d];
 
-  const nonLocked = TEAM_NAMES.filter((n) => !LOCKED_WFH[n]);
+  const nonLocked = names.filter((n) => !result[n]);
   const n = nonLocked.length;
 
   // Find balanced distributions with a max-per-combo cap for diversity.

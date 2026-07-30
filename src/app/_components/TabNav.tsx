@@ -20,6 +20,9 @@ function TabNavInner() {
   const isMobile = useIsMobile();
   const isNextMonth = path === "/" && searchParams.get("month") === "next";
 
+  // This tab strip is specific to the WFH scheduler — hide it elsewhere
+  if (path !== "/" && path !== "/history") return null;
+
   const TABS = [
     {
       id: "/",

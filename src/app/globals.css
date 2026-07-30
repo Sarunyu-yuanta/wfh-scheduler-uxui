@@ -5,3 +5,26 @@
 .th-day-center > div {
   justify-content: center !important;
 }
+
+/* Match NavHeader's inner width to the page content's max-w-[1024px] */
+.wfh-navbar > div {
+  max-width: 1024px !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+/* Thin, unobtrusive scrollbar for the roster picker list */
+.roster-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+.roster-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.roster-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.roster-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 999px;
+}

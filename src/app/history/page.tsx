@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle } from "@phosphor-icons/react";
+import { CheckCircle, House } from "@phosphor-icons/react";
 import { TeamAvatar, displayName } from "../_components/TeamAvatar";
 import {
   Button,
@@ -25,6 +25,7 @@ import {
 
 export default function HistoryPage() {
   const [allWeeks, setAllWeeks] = useState<Record<string, Schedule>>({});
+  const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
   const [loaded, setLoaded] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [restoredMonth, setRestoredMonth] = useState<string | null>(null);
@@ -36,6 +37,13 @@ export default function HistoryPage() {
       .then((data: Record<string, Schedule>) => setAllWeeks(data))
       .catch(console.error)
       .finally(() => setLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/team")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data: { names: string[] }) => setTeamNames(data.names))
+      .catch(() => {});
   }, []);
 
   const currentMonthKey = thisWeek.slice(0, 7);
@@ -88,6 +96,11 @@ export default function HistoryPage() {
             : weeks[weeks.length - 1];
           const schedule = allWeeks[representativeWeek] ?? {};
           const justRestored = restoredMonth === label;
+          // Union so people removed from the team since this month still show
+          // for the months they actually had a schedule in.
+          const rowNames = Array.from(
+            new Set([...teamNames, ...Object.keys(schedule)]),
+          );
 
           return (
             <div key={label} className="mb-10">
@@ -136,7 +149,7 @@ export default function HistoryPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {TEAM_NAMES.map((name) => (
+                      {rowNames.map((name) => (
                         <TableRow key={name}>
                           <TableCell>
                             <div className="flex items-center gap-3">
@@ -153,10 +166,10 @@ export default function HistoryPage() {
                               <TableCell key={day.id}>
                                 <div className="flex justify-center items-center">
                                   {isWfh ? (
-                                    <CheckCircle
+                                    <House
                                       size={28}
                                       weight="fill"
-                                      className="text-border opacity-5"
+                                      className="text-gray-300"
                                     />
                                   ) : (
                                     <CheckCircle
@@ -178,7 +191,7 @@ export default function HistoryPage() {
                 {/* Day balance */}
                 <div className="px-6 py-4 border-t border-divider flex gap-6 flex-wrap">
                   {WEEKDAYS.filter((d) => d.allowWfh).map((day) => {
-                    const wfh = TEAM_NAMES.filter((n) =>
+                    const wfh = rowNames.filter((n) =>
                       schedule[n]?.includes(day.id)
                     ).length;
                     return (
@@ -188,7 +201,7 @@ export default function HistoryPage() {
                         </span>
                         <span className="type-caption text-muted-foreground">ออฟฟิศ</span>
                         <span className="type-caption-bold text-foreground">
-                          {TEAM_NAMES.length - wfh}
+                          {rowNames.length - wfh}
                         </span>
                       </div>
                     );
