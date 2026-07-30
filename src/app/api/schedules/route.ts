@@ -47,21 +47,22 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { weekStart, schedule } = (await req.json()) as {
-      weekStart: string;
+    const { weekStarts, schedule } = (await req.json()) as {
+      weekStarts: string[];
       schedule: Record<string, string[]>;
     };
+
+    if (!Array.isArray(weekStarts) || weekStarts.length === 0) {
+      return NextResponse.json({ error: "weekStarts required" }, { status: 400 });
+    }
 
     await ensureTable();
     const sql = getSql();
 
     // Snapshot current schedule before overwriting (enables 1-level undo)
-    const monthKey = weekStart.slice(0, 7);
+    const monthKey = weekStarts[0].slice(0, 7);
     const current = await sql`
-      SELECT schedule FROM schedule_weeks
-      WHERE week_start >= date_trunc('month', ${weekStart}::date)
-        AND week_start < date_trunc('month', ${weekStart}::date) + INTERVAL '1 month'
-      LIMIT 1
+      SELECT schedule FROM schedule_weeks WHERE week_start = ${weekStarts[0]}
     `;
     if (current.length > 0) {
       await sql`
@@ -71,20 +72,15 @@ export async function POST(req: Request) {
       `;
     }
 
-    // Update all weeks in the same month
-    await sql`
-      UPDATE schedule_weeks
-      SET schedule = ${JSON.stringify(schedule)}, saved_at = now()
-      WHERE week_start >= date_trunc('month', ${weekStart}::date)
-        AND week_start < date_trunc('month', ${weekStart}::date) + INTERVAL '1 month'
-    `;
-
-    // Ensure current week exists (if not seeded yet)
-    await sql`
-      INSERT INTO schedule_weeks (week_start, schedule)
-      VALUES (${weekStart}, ${JSON.stringify(schedule)})
-      ON CONFLICT (week_start) DO NOTHING
-    `;
+    // Upsert every week of the target month — covers months (e.g. next month)
+    // that don't have rows yet, not just ones already seeded.
+    for (const ws of weekStarts) {
+      await sql`
+        INSERT INTO schedule_weeks (week_start, schedule)
+        VALUES (${ws}, ${JSON.stringify(schedule)})
+        ON CONFLICT (week_start) DO UPDATE SET schedule = ${JSON.stringify(schedule)}, saved_at = now()
+      `;
+    }
 
     // Keep current month + previous month only
     await sql`

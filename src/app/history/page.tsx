@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CheckCircle } from "@phosphor-icons/react";
-import { TeamAvatar } from "../_components/TeamAvatar";
+import { TeamAvatar, displayName } from "../_components/TeamAvatar";
 import {
   Button,
   Tag,
@@ -20,10 +20,12 @@ import {
   WEEKDAYS,
   groupWeeksByMonth,
   currentWeekStart,
+  monthWeekStarts,
 } from "@/lib/schedule";
 
 export default function HistoryPage() {
   const [allWeeks, setAllWeeks] = useState<Record<string, Schedule>>({});
+  const [loaded, setLoaded] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [restoredMonth, setRestoredMonth] = useState<string | null>(null);
   const thisWeek = currentWeekStart();
@@ -32,19 +34,33 @@ export default function HistoryPage() {
     fetch("/api/schedules")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data: Record<string, Schedule>) => setAllWeeks(data))
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoaded(true));
   }, []);
 
-  const months = groupWeeksByMonth(Object.keys(allWeeks));
+  const currentMonthKey = thisWeek.slice(0, 7);
+  const months = [...groupWeeksByMonth(Object.keys(allWeeks))]
+    .filter((m) => m.weeks[0].slice(0, 7) <= currentMonthKey)
+    .sort((a, b) => {
+      const aCurrent = a.weeks.includes(thisWeek);
+      const bCurrent = b.weeks.includes(thisWeek);
+      if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+      return b.weeks[0].localeCompare(a.weeks[0]);
+    });
 
   const restore = async (label: string, schedule: Schedule) => {
     setRestoring(label);
+    const weekStarts = monthWeekStarts(0);
     await fetch("/api/schedules", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekStart: thisWeek, schedule }),
+      body: JSON.stringify({ weekStarts, schedule }),
     });
-    setAllWeeks((prev) => ({ ...prev, [thisWeek]: schedule }));
+    setAllWeeks((prev) => {
+      const next = { ...prev };
+      for (const ws of weekStarts) next[ws] = schedule;
+      return next;
+    });
     setRestoring(null);
     setRestoredMonth(label);
   };
@@ -54,11 +70,18 @@ export default function HistoryPage() {
       <div className="max-w-[1024px] mx-auto px-6 pt-6 pb-8">
         <h1 className="type-h4 text-foreground mb-8">ประวัติรายเดือน</h1>
 
-        {months.length === 0 && (
+        {!loaded && (
+          <div className="animate-pulse flex flex-col gap-6">
+            <div className="bg-muted rounded-2xl h-72" />
+            <div className="bg-muted rounded-2xl h-72" />
+          </div>
+        )}
+
+        {loaded && months.length === 0 && (
           <p className="type-body-2 text-muted-foreground">ยังไม่มีข้อมูล</p>
         )}
 
-        {months.map(({ label, weeks }) => {
+        {loaded && months.map(({ label, weeks }) => {
           const isCurrentMonth = weeks.includes(thisWeek);
           const representativeWeek = isCurrentMonth
             ? thisWeek
@@ -117,8 +140,8 @@ export default function HistoryPage() {
                         <TableRow key={name}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <TeamAvatar name={name} size="m" />
-                              <span className="type-body-2 text-foreground">{name}</span>
+                              <TeamAvatar name={name} size="m" isCurrent={isCurrentMonth} />
+                              <span className="type-body-2 text-foreground">{displayName(name, isCurrentMonth)}</span>
                               {LOCKED_WFH[name] && (
                                 <Tag text="ล็อควัน" variant="yellow" size="small" />
                               )}
@@ -133,13 +156,13 @@ export default function HistoryPage() {
                                     <CheckCircle
                                       size={28}
                                       weight="fill"
-                                      className="text-primary-action"
+                                      className="text-border opacity-5"
                                     />
                                   ) : (
                                     <CheckCircle
                                       size={28}
                                       weight="fill"
-                                      className="text-border opacity-5"
+                                      className="text-primary-action"
                                     />
                                   )}
                                 </div>

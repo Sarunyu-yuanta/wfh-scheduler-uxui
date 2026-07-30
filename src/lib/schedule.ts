@@ -18,6 +18,7 @@ const VALID_COMBOS: DayId[][] = [
   ["tue", "thu"],
   ["tue", "fri"],
   ["thu", "fri"],
+  ["mon", "fri"],
 ];
 
 // Pre-set schedule for June–July 2026 (provided by the team)
@@ -78,15 +79,17 @@ export function generateSchedule(): Schedule {
       for (let x1 = 0; x1 <= cap; x1++) {
         for (let x2 = 0; x2 <= cap; x2++) {
           for (let x3 = 0; x3 <= cap; x3++) {
-            const x4 = n - x0 - x1 - x2 - x3;
-            if (x4 < 0 || x4 > cap) continue;
-            if (
-              x0 + x1 === remaining.mon &&
-              x0 + x2 + x3 === remaining.tue &&
-              x1 + x2 + x4 === remaining.thu &&
-              x3 + x4 === remaining.fri
-            ) {
-              results.push([x0, x1, x2, x3, x4]);
+            for (let x4 = 0; x4 <= cap; x4++) {
+              const x5 = n - x0 - x1 - x2 - x3 - x4;
+              if (x5 < 0 || x5 > cap) continue;
+              if (
+                x0 + x1 + x5 === remaining.mon &&
+                x0 + x2 + x3 === remaining.tue &&
+                x1 + x2 + x4 === remaining.thu &&
+                x3 + x4 + x5 === remaining.fri
+              ) {
+                results.push([x0, x1, x2, x3, x4, x5]);
+              }
             }
           }
         }
@@ -182,6 +185,30 @@ export function currentWeekStart(): string {
   return toISO(getMondayOf(new Date()));
 }
 
+// All Monday week-starts that fall within the calendar month `offset` months
+// from today (0 = this month, 1 = next month). One schedule applies to every
+// week of a month, so this is the full set that needs to be kept in sync.
+export function monthWeekStarts(offset: number): string[] {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + offset;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const starts: string[] = [];
+  for (let day = 1; day <= lastDay; day++) {
+    const d = new Date(year, month, day);
+    if (d.getDay() === 1) starts.push(toISO(d));
+  }
+  return starts;
+}
+
+export function monthKeyForOffset(offset: number): string {
+  return monthWeekStarts(offset)[0].slice(0, 7);
+}
+
+export function monthLabelForOffset(offset: number): string {
+  return monthLabel(monthWeekStarts(offset)[0]);
+}
+
 export function weekDayLabels(mondayISO: string) {
   const monday = new Date(mondayISO + "T00:00:00");
   return WEEKDAYS.map((day, i) => {
@@ -206,9 +233,9 @@ export function weekRangeLabel(mondayISO: string): string {
 // "วันนี้ ถึง สิ้นเดือนหน้า" e.g. "18 มิ.ย. – 31 ก.ค. 2569"
 export function currentPeriodLabel(): string {
   const today = new Date();
-  const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   const s = today.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
-  const e = endOfNextMonth.toLocaleDateString("th-TH", {
+  const e = endOfMonth.toLocaleDateString("th-TH", {
     day: "numeric",
     month: "short",
     year: "numeric",

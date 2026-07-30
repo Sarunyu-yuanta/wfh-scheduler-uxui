@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSql, ensureTable } from "@/lib/db";
 
-function currentMonthKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const monthKey = new URL(req.url).searchParams.get("monthKey");
+    if (!monthKey) {
+      return NextResponse.json({ error: "monthKey required" }, { status: 400 });
+    }
+
     await ensureTable();
     const sql = getSql();
-    const monthKey = currentMonthKey();
     const rows = await sql`
       SELECT 1 FROM schedule_undo WHERE month_key = ${monthKey}
     `;
@@ -20,11 +19,15 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    const { monthKey } = (await req.json()) as { monthKey: string };
+    if (!monthKey) {
+      return NextResponse.json({ error: "monthKey required" }, { status: 400 });
+    }
+
     await ensureTable();
     const sql = getSql();
-    const monthKey = currentMonthKey();
 
     const rows = await sql`
       SELECT schedule FROM schedule_undo WHERE month_key = ${monthKey}
@@ -34,12 +37,13 @@ export async function POST() {
     }
 
     const schedule = rows[0].schedule;
+    const monthStart = `${monthKey}-01`;
 
     await sql`
       UPDATE schedule_weeks
       SET schedule = ${JSON.stringify(schedule)}, saved_at = now()
-      WHERE week_start >= date_trunc('month', CURRENT_DATE)
-        AND week_start < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
+      WHERE week_start >= ${monthStart}::date
+        AND week_start < ${monthStart}::date + INTERVAL '1 month'
     `;
 
     await sql`DELETE FROM schedule_undo WHERE month_key = ${monthKey}`;

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react";
-import { TeamAvatar } from "./_components/TeamAvatar";
+import { TeamAvatar, displayName, avatarStackItem } from "./_components/TeamAvatar";
 import {
   Button,
   Avatar,
@@ -27,9 +28,10 @@ import type { ToastProps, TagVariant } from "@sarunyu/system-one";
 const COMBO_COLORS: Record<string, TagVariant> = {
   "mon-tue": "blue",
   "mon-thu": "green",
-  "tue-thu": "yellow",
+  "thu-tue": "yellow",
   "fri-tue": "lime",
   "fri-thu": "red",
+  "fri-mon": "gray",
 };
 function comboVariant(days: string[]): TagVariant {
   return COMBO_COLORS[[...days].sort().join("-")] ?? "gray";
@@ -45,32 +47,57 @@ import {
   currentWeekStart,
   currentPeriodLabel,
   SEED_SCHEDULE,
+  monthWeekStarts,
+  monthKeyForOffset,
+  monthLabelForOffset,
 } from "@/lib/schedule";
 
 export default function Page() {
-  const isMobile = useIsMobile();
-  const weekStart = currentWeekStart();
-  const days = weekDayLabels(weekStart);
+  return (
+    <Suspense fallback={null}>
+      <PageContent />
+    </Suspense>
+  );
+}
 
-  const [schedule, setSchedule] = useState<Schedule>(SEED_SCHEDULE);
+function PageContent() {
+  const isMobile = useIsMobile();
+  const searchParams = useSearchParams();
+  const monthOffset: 0 | 1 = searchParams.get("month") === "next" ? 1 : 0;
+  const weekStarts = monthWeekStarts(monthOffset);
+  const activeWeekStart = monthOffset === 0 ? currentWeekStart() : weekStarts[0];
+  const days = weekDayLabels(activeWeekStart);
+
+  const [scheduleMap, setScheduleMap] = useState<Record<string, Schedule>>({});
+  const [schedulesLoaded, setSchedulesLoaded] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [rollTarget, setRollTarget] = useState<0 | 1>(0);
+  const [hoveredTarget, setHoveredTarget] = useState<0 | 1 | null>(null);
   const [preview, setPreview] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [toasts, setToasts] = useState<Array<ToastProps & { id: string }>>([]);
 
+  const nextMonthNotGenerated =
+    schedulesLoaded && monthOffset === 1 && !scheduleMap[activeWeekStart];
+  const schedule: Schedule =
+    scheduleMap[activeWeekStart] ?? (monthOffset === 0 ? SEED_SCHEDULE : {});
+
   const removeToast = useCallback((id: string) => {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
-  useEffect(() => {
-    fetch("/api/schedules")
+  const refreshSchedules = useCallback(() => {
+    return fetch("/api/schedules")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((all: Record<string, Schedule>) =>
-        setSchedule(all[weekStart] ?? SEED_SCHEDULE),
-      )
-      .catch(() => setSchedule(SEED_SCHEDULE));
-  }, [weekStart]);
+      .then((all: Record<string, Schedule>) => setScheduleMap(all))
+      .catch(() => {})
+      .finally(() => setSchedulesLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    refreshSchedules();
+  }, [refreshSchedules]);
 
   // Animate progress bar while loading
   useEffect(() => {
@@ -86,8 +113,9 @@ export default function Page() {
     setPreview(null);
     setIsLoading(false);
     setLoadProgress(0);
+    setRollTarget(monthOffset);
     setModalOpen(true);
-  }, []);
+  }, [monthOffset]);
 
   const roll = useCallback(() => {
     setIsLoading(true);
@@ -99,35 +127,43 @@ export default function Page() {
     }, 700);
   }, []);
 
-  const undo = useCallback(async () => {
-    const r = await fetch("/api/schedules/undo", { method: "POST" });
+  const undo = useCallback(async (offset: 0 | 1) => {
+    const monthKey = monthKeyForOffset(offset);
+    const r = await fetch("/api/schedules/undo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ monthKey }),
+    });
     if (r.ok) {
-      const { schedule: prev } = await r.json();
-      setSchedule(prev);
+      await refreshSchedules();
     }
     removeToast("undo-toast");
-  }, [removeToast]);
+  }, [removeToast, refreshSchedules]);
 
   const confirm = useCallback(async () => {
     if (!preview) return;
+    const offset = rollTarget;
     await fetch("/api/schedules", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekStart, schedule: preview }),
+      body: JSON.stringify({ weekStarts: monthWeekStarts(offset), schedule: preview }),
     });
-    setSchedule(preview);
+    await refreshSchedules();
     setModalOpen(false);
     setToasts([
       {
         id: "undo-toast",
-        message: "บันทึกตารางใหม่แล้ว",
+        message:
+          offset === 0
+            ? "บันทึกตารางใหม่แล้ว"
+            : `บันทึกตารางเดือน ${monthLabelForOffset(1)} แล้ว`,
         actionLabel: "Undo",
         status: "success",
-        onActionClick: undo,
+        onActionClick: () => undo(offset),
         onClose: () => removeToast("undo-toast"),
       },
     ]);
-  }, [weekStart, preview, undo, removeToast]);
+  }, [rollTarget, preview, undo, removeToast, refreshSchedules]);
 
   const inOfficeCount = (dayId: DayId) =>
     TEAM_NAMES.filter((n) => !schedule[n]?.includes(dayId)).length;
@@ -138,9 +174,11 @@ export default function Page() {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="type-h4 text-foreground">เดือนนี้</h1>
+            <h1 className="type-h4 text-foreground">
+              {monthOffset === 0 ? "เดือนนี้" : "เดือนหน้า"}
+            </h1>
             <p className="type-body-2 text-muted-foreground mt-1">
-              {currentPeriodLabel()}
+              {monthOffset === 0 ? currentPeriodLabel() : monthLabelForOffset(1)}
             </p>
           </div>
           {/* Desktop only — mobile uses sticky bar below */}
@@ -150,10 +188,36 @@ export default function Page() {
             onClick={openModal}
             className="hidden sm:flex"
           >
-            สุ่มตาราง WFH
+            สุ่มตาราง
           </Button>
         </div>
 
+        {!schedulesLoaded ? (
+          <div className="animate-pulse">
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-5 md:overflow-visible mb-6">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-muted rounded-2xl p-4 h-40 shrink-0 min-w-[180px] md:min-w-0 md:shrink"
+                />
+              ))}
+            </div>
+            <div className="bg-muted rounded-2xl h-64" />
+          </div>
+        ) : nextMonthNotGenerated ? (
+          <div className="bg-muted rounded-2xl px-4 py-10 flex flex-col items-center gap-3 mb-6">
+            <p className="type-h5 text-foreground text-center">
+              ยังไม่มีตารางสำหรับ{monthLabelForOffset(1)}
+            </p>
+            <p className="type-body-2 text-muted-foreground text-center">
+              กดสุ่มตาราง WFH เพื่อเตรียมตารางล่วงหน้าไว้ก่อนได้เลย
+            </p>
+            <Button variant="primary" size="lg" onClick={openModal} className="mt-2">
+              สุ่มตาราง
+            </Button>
+          </div>
+        ) : (
+          <>
         {/* Day summary cards */}
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-6 px-6 md:mx-0 md:px-0 md:grid md:grid-cols-5 md:overflow-visible mb-6">
           {days.map((day) => {
@@ -163,12 +227,7 @@ export default function Page() {
             const officeMembers = TEAM_NAMES.filter(
               (n) => !wfhMembers.includes(n),
             );
-            const toItems = (names: string[]) =>
-              names.map((name) => ({
-                src: `/avatars/${name.toLowerCase()}.jpeg`,
-                alt: name,
-                initials: name[0],
-              }));
+            const toItems = (names: string[]) => names.map((name) => avatarStackItem(name));
             return (
               <div
                 key={day.id}
@@ -217,7 +276,7 @@ export default function Page() {
 
         {/* Schedule table */}
         <div className="border-t border-border mt-10 mb-6" />
-        <p className="type-h5 text-foreground mb-4">ตาราง WFH</p>
+        <p className="type-h5 text-foreground mb-4">ตารางเข้าออฟฟิศ</p>
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <Table className="table-fixed w-full">
@@ -249,7 +308,7 @@ export default function Page() {
                       <div className="flex items-center gap-3">
                         <TeamAvatar name={name} size="m" />
                         <span className="type-body-2 text-foreground">
-                          {name}
+                          {displayName(name)}
                         </span>
                         {LOCKED_WFH[name] && (
                           <Tag text="ล็อควัน" variant="yellow" size="small" />
@@ -265,13 +324,13 @@ export default function Page() {
                               <CheckCircleIcon
                                 size={28}
                                 weight="fill"
-                                className="text-primary-action"
+                                className="text-border opacity-5"
                               />
                             ) : (
                               <CheckCircleIcon
                                 size={28}
                                 weight="fill"
-                                className="text-border opacity-5"
+                                className="text-primary-action"
                               />
                             )}
                           </div>
@@ -294,7 +353,7 @@ export default function Page() {
               className="text-primary-action"
             />
             <span className="type-caption text-muted-foreground">
-              Work From Home
+              เข้าออฟฟิศ
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -304,7 +363,7 @@ export default function Page() {
               className="text-border opacity-20"
             />
             <span className="type-caption text-muted-foreground">
-              เข้าออฟฟิศ
+              Work From Home
             </span>
           </div>
         </div>
@@ -345,12 +404,7 @@ export default function Page() {
                     }))
                     .filter((g) => g.members.length > 0);
 
-                  const toItems = (names: string[]) =>
-                    names.map((n) => ({
-                      src: `/avatars/${n.toLowerCase()}.jpeg`,
-                      alt: n,
-                      initials: n[0],
-                    }));
+                  const toItems = (names: string[]) => names.map((n) => avatarStackItem(n));
 
                   return (
                     <div
@@ -360,7 +414,7 @@ export default function Page() {
                       <div className="flex items-center gap-2 w-24 shrink-0 pt-1">
                         <TeamAvatar name={name} size="l" />
                         <span className="type-body-2 text-foreground">
-                          {name}
+                          {displayName(name)}
                         </span>
                       </div>
                       <div className="flex flex-col gap-3 ml-auto">
@@ -386,6 +440,8 @@ export default function Page() {
             </div>
           );
         })()}
+          </>
+        )}
 
         {/* Rules */}
         <div className="border-t border-border mt-10 mb-6" />
@@ -394,10 +450,7 @@ export default function Page() {
           <ul className="space-y-1">
             {[
               "WFH ได้วันจันทร์ อังคาร พฤหัส หรือศุกร์ (ห้าม WFH วันพุธ)",
-              "ห้าม WFH วันจันทร์คู่กับศุกร์ในสัปดาห์เดียวกัน",
               "แต่ละคนได้ WFH สูงสุด 2 วันต่อสัปดาห์",
-              "ทุกวันที่ WFH ได้จะมีคนเข้าออฟฟิศ 4 คนพอดี",
-              "แต่ละ combo วัน WFH ถูกใช้ไม่เกิน 2 คน เพื่อให้กระจาย",
             ].map((rule) => (
               <li key={rule} className="flex items-start gap-2">
                 <span className="type-body-2 text-muted-foreground">•</span>
@@ -418,7 +471,7 @@ export default function Page() {
           onClick={openModal}
           className="w-full"
         >
-          สุ่มตาราง WFH
+          สุ่มตาราง
         </Button>
       </div>
 
@@ -426,8 +479,54 @@ export default function Page() {
 
       {/* Shared modal body — used in both Modal (desktop) and BottomSheet (mobile) */}
       {(() => {
+        const modalTitle =
+          rollTarget === 0
+            ? "สุ่มตาราง WFH ใหม่ (เดือนนี้)"
+            : `สุ่มตาราง WFH ใหม่ (${monthLabelForOffset(1)})`;
         const body = (
           <div className="flex flex-col gap-4">
+            {/* ── Target month picker (segmented control) — only before rolling ── */}
+            {!preview && (
+              <div className="inline-flex bg-muted rounded-full p-1 gap-1 self-center">
+                <button
+                  type="button"
+                  onClick={() => setRollTarget(0)}
+                  onMouseEnter={() => setHoveredTarget(0)}
+                  onMouseLeave={() => setHoveredTarget(null)}
+                  style={
+                    rollTarget !== 0 && hoveredTarget === 0
+                      ? { backgroundColor: "rgba(127,127,127,0.12)" }
+                      : undefined
+                  }
+                  className={`px-4 py-1.5 rounded-full type-body-2 transition-colors cursor-pointer ${
+                    rollTarget === 0
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  เดือนนี้
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRollTarget(1)}
+                  onMouseEnter={() => setHoveredTarget(1)}
+                  onMouseLeave={() => setHoveredTarget(null)}
+                  style={
+                    rollTarget !== 1 && hoveredTarget === 1
+                      ? { backgroundColor: "rgba(127,127,127,0.12)" }
+                      : undefined
+                  }
+                  className={`px-4 py-1.5 rounded-full type-body-2 transition-colors cursor-pointer ${
+                    rollTarget === 1
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  เดือนหน้า ({monthLabelForOffset(1)})
+                </button>
+              </div>
+            )}
+
             {/* ── State 1: Empty ── */}
             {!isLoading && !preview && (
               <div className="bg-muted rounded-2xl px-4 py-8 flex flex-col items-center gap-2">
@@ -496,7 +595,7 @@ export default function Page() {
                           <TeamAvatar name={name} size="m" />
                           <div>
                             <p className="type-body-2 text-foreground">
-                              {name}
+                              {displayName(name)}
                             </p>
                             {LOCKED_WFH[name] && (
                               <p className="type-caption text-muted-foreground">
@@ -542,7 +641,7 @@ export default function Page() {
                   onClick={roll}
                   disabled={isLoading}
                 >
-                  สุ่มตาราง WFH
+                  สุ่มตาราง
                 </Button>
               ) : (
                 <>
@@ -550,7 +649,7 @@ export default function Page() {
                     ยืนยันใช้ตารางนี้
                   </Button>
                   <Button variant="outline" size="xl" onClick={roll}>
-                    สุ่มตาราง WFH อีกครั้ง
+                    สุ่มตารางอีกครั้ง
                   </Button>
                 </>
               )}
@@ -570,7 +669,7 @@ export default function Page() {
             <BottomSheet
               open={modalOpen}
               onOpenChange={(v) => !v && setModalOpen(false)}
-              title="สุ่มตาราง WFH ใหม่"
+              title={modalTitle}
               rightSide="icon"
             >
               {body}
@@ -588,7 +687,7 @@ export default function Page() {
                 variant="content"
                 responsive="desktop"
                 actionLayout="none"
-                title="สุ่มตาราง WFH ใหม่"
+                title={modalTitle}
                 onClose={() => setModalOpen(false)}
               >
                 {body}
