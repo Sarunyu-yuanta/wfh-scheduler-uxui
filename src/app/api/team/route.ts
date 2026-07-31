@@ -48,6 +48,36 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PATCH(req: Request) {
+  try {
+    const { oldName, newName } = (await req.json()) as {
+      oldName: string;
+      newName: string;
+    };
+    if (!oldName || !newName || !newName.trim()) {
+      return NextResponse.json({ error: "oldName and newName required" }, { status: 400 });
+    }
+    const trimmed = newName.trim();
+
+    await ensureTable();
+    const sql = getSql();
+
+    if (trimmed !== oldName) {
+      const existing = await sql`SELECT 1 FROM team_members WHERE name = ${trimmed}`;
+      if (existing.length > 0) {
+        return NextResponse.json({ error: "มีชื่อนี้อยู่ในทีมแล้ว" }, { status: 409 });
+      }
+    }
+
+    await sql`UPDATE team_members SET name = ${trimmed} WHERE name = ${oldName}`;
+    const rows = await sql`SELECT name FROM team_members ORDER BY created_at`;
+    return NextResponse.json({ names: rows.map((r) => r.name as string) });
+  } catch (err) {
+    console.error("[PATCH /api/team]", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     const { name } = (await req.json()) as { name: string };

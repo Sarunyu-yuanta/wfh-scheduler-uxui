@@ -95,6 +95,7 @@ export default function HistoryPage() {
             ? thisWeek
             : weeks[weeks.length - 1];
           const schedule = allWeeks[representativeWeek] ?? {};
+          const rowMonthKey = representativeWeek.slice(0, 7);
           const justRestored = restoredMonth === label;
           // Union so people removed from the team since this month still show
           // for the months they actually had a schedule in.
@@ -153,8 +154,8 @@ export default function HistoryPage() {
                         <TableRow key={name}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <TeamAvatar name={name} size="m" isCurrent={isCurrentMonth} />
-                              <span className="type-body-2 text-foreground">{displayName(name, isCurrentMonth)}</span>
+                              <TeamAvatar name={name} size="m" monthKey={rowMonthKey} />
+                              <span className="type-body-2 text-foreground">{displayName(name, rowMonthKey)}</span>
                               {LOCKED_WFH[name] && (
                                 <Tag text="ล็อควัน" variant="yellow" size="small" />
                               )}

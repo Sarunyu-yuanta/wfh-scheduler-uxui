@@ -6,6 +6,7 @@ import { NavHeader } from "@sarunyu/system-one";
 const APPS = [
   { label: "Office Scheduler", href: "/" },
   { label: "Scrum Master Scheduler", href: "/scrum-master" },
+  { label: "Team Member", href: "/team" },
 ];
 
 export function NavBar() {

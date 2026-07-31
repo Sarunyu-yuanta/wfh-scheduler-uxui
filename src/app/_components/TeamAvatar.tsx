@@ -2,59 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { Avatar, type AvatarStackItem } from "@sarunyu/system-one";
+import { monthKeyForOffset } from "@/lib/schedule";
 
-type AvatarSize = "xxs" | "xs" | "s" | "m" | "l" | "xl" | "xxl";
+export type AvatarSize = "xxs" | "xs" | "s" | "m" | "l" | "xl" | "xxl";
 
-// This seat changed hands this month — the new person shows as anonymous
-// going forward, while past months still show the previous occupant.
-const REPLACED_THIS_MONTH = new Set(["Art"]);
+// This seat changed hands — the new person shows as anonymous starting the
+// given month ("YYYY-MM"), while that month and everything before it still
+// shows the previous occupant.
+const REPLACED_FROM_MONTH: Record<string, string> = { Art: "2026-08" };
 
-export function displayName(name: string, isCurrent = true): string {
-  return isCurrent && REPLACED_THIS_MONTH.has(name) ? "Anonymous" : name;
+function isReplaced(name: string, monthKey: string): boolean {
+  const from = REPLACED_FROM_MONTH[name];
+  return from !== undefined && monthKey >= from;
 }
 
-export function avatarStackItem(name: string, isCurrent = true): AvatarStackItem {
-  if (isCurrent && REPLACED_THIS_MONTH.has(name)) {
+export function displayName(name: string, monthKey: string = monthKeyForOffset(0)): string {
+  return isReplaced(name, monthKey) ? "Anonymous" : name;
+}
+
+export function avatarStackItem(
+  name: string,
+  monthKey: string = monthKeyForOffset(0),
+): AvatarStackItem {
+  if (isReplaced(name, monthKey)) {
     return { type: "placeholder" };
   }
   return { src: `/avatars/${name.toLowerCase()}.jpeg`, alt: name, initials: name[0] };
-}
-
-const SIZE_PX: Record<AvatarSize, number> = {
-  xxs: 16,
-  xs: 20,
-  s: 24,
-  m: 32,
-  l: 40,
-  xl: 48,
-  xxl: 52,
-};
-const FONT_PX: Record<AvatarSize, number> = {
-  xxs: 8,
-  xs: 9,
-  s: 10,
-  m: 13,
-  l: 16,
-  xl: 18,
-  xxl: 20,
-};
-
-// People without a photo on file (e.g. freshly added team members) get a
-// 2-letter avatar instead of the design system's single-character fallback.
-function TwoLetterAvatar({ name, size }: { name: string; size: AvatarSize }) {
-  return (
-    <span
-      className="inline-flex items-center justify-center rounded-full text-white font-bold shrink-0"
-      style={{
-        width: SIZE_PX[size],
-        height: SIZE_PX[size],
-        fontSize: FONT_PX[size],
-        background: "linear-gradient(135deg, #60a5fa, #a78bfa)",
-      }}
-    >
-      {name.slice(0, 2).toUpperCase()}
-    </span>
-  );
 }
 
 const CANDIDATES = (name: string) => [
@@ -80,14 +53,14 @@ async function resolvePhoto(name: string): Promise<string | null> {
 export function TeamAvatar({
   name,
   size = "s",
-  isCurrent = true,
+  monthKey = monthKeyForOffset(0),
 }: {
   name: string;
   size?: AvatarSize;
-  isCurrent?: boolean;
+  monthKey?: string;
 }) {
   const [photoSrc, setPhotoSrc] = useState<string | null | undefined>(undefined);
-  const isAnonymous = isCurrent && REPLACED_THIS_MONTH.has(name);
+  const isAnonymous = isReplaced(name, monthKey);
 
   useEffect(() => {
     if (isAnonymous) return;
@@ -104,7 +77,7 @@ export function TeamAvatar({
   ) : photoSrc ? (
     <Avatar type="photo" src={photoSrc} alt={name} size={size} />
   ) : (
-    <TwoLetterAvatar name={name} size={size} />
+    <Avatar type="text" initials={name[0]} size={size} />
   );
 
   return (

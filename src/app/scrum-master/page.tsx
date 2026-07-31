@@ -12,12 +12,13 @@ import {
 } from "@sarunyu/system-one";
 import type { ToastProps } from "@sarunyu/system-one";
 import { Wheel, type WheelHandle } from "./_components/Wheel";
+import { TEAM_NAMES } from "@/lib/schedule";
 
 export default function ScrumMasterPage() {
   const isMobile = useIsMobile();
-  const [teamNames, setTeamNames] = useState<string[]>([]);
+  const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
   const [loaded, setLoaded] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set(TEAM_NAMES));
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);

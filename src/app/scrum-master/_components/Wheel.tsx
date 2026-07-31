@@ -1,8 +1,10 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { TeamAvatar, type AvatarSize } from "../../_components/TeamAvatar";
 
 export interface WheelSlice {
+  /** Raw team member name — used both as the React key and to resolve the avatar. */
   key: string;
   label: string;
 }
@@ -20,6 +22,29 @@ interface WheelProps {
 function pointOnCircle(cx: number, cy: number, angleDeg: number, radius: number) {
   const rad = (angleDeg * Math.PI) / 180;
   return { x: cx + radius * Math.sin(rad), y: cy - radius * Math.cos(rad) };
+}
+
+const AVATAR_SIZE_PX: Record<AvatarSize, number> = {
+  xxs: 16,
+  xs: 20,
+  s: 24,
+  m: 32,
+  l: 40,
+  xl: 48,
+  xxl: 52,
+};
+
+function nearestAvatarSize(px: number): AvatarSize {
+  let best: AvatarSize = "m";
+  let bestDiff = Infinity;
+  for (const token of Object.keys(AVATAR_SIZE_PX) as AvatarSize[]) {
+    const diff = Math.abs(AVATAR_SIZE_PX[token] - px);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = token;
+    }
+  }
+  return best;
 }
 
 export const Wheel = forwardRef<WheelHandle, WheelProps>(function Wheel(
@@ -101,34 +126,39 @@ export const Wheel = forwardRef<WheelHandle, WheelProps>(function Wheel(
         {n <= 1 ? (
           <circle cx={cx} cy={cy} r={r} fill={colors[0] ?? "#e5e7eb"} stroke="#fff" strokeWidth={3} />
         ) : (
-          slices.map((slice, i) => {
-            const startAngle = i * segAngle;
-            const endAngle = (i + 1) * segAngle;
-            const p1 = pointOnCircle(cx, cy, startAngle, r);
-            const p2 = pointOnCircle(cx, cy, endAngle, r);
-            const largeArc = segAngle > 180 ? 1 : 0;
-            const path = `M ${cx},${cy} L ${p1.x},${p1.y} A ${r},${r} 0 ${largeArc} 1 ${p2.x},${p2.y} Z`;
-            const centerAngle = startAngle + segAngle / 2;
+          (() => {
             const labelR = r * 0.62;
-            return (
-              <g key={slice.key}>
-                <path d={path} fill={colors[i]} stroke="#fff" strokeWidth={2} />
-                <g transform={`rotate(${centerAngle} ${cx} ${cy})`}>
-                  <text
-                    x={cx}
-                    y={cy - labelR}
-                    textAnchor="middle"
-                    fontSize={n > 8 ? 11 : n > 5 ? 13 : 15}
-                    fontWeight={700}
-                    fill="#ffffff"
-                    style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.18)", strokeWidth: 2 }}
+            const arcLen = (2 * Math.PI * labelR) / n;
+            const avatarPx = Math.max(16, Math.min(48, Math.round(arcLen * 0.75)));
+            const avatarSize = nearestAvatarSize(avatarPx);
+            return slices.map((slice, i) => {
+              const startAngle = i * segAngle;
+              const endAngle = (i + 1) * segAngle;
+              const p1 = pointOnCircle(cx, cy, startAngle, r);
+              const p2 = pointOnCircle(cx, cy, endAngle, r);
+              const largeArc = segAngle > 180 ? 1 : 0;
+              const path = `M ${cx},${cy} L ${p1.x},${p1.y} A ${r},${r} 0 ${largeArc} 1 ${p2.x},${p2.y} Z`;
+              const centerAngle = startAngle + segAngle / 2;
+              const avatarPoint = pointOnCircle(cx, cy, centerAngle, labelR);
+              return (
+                <g key={slice.key}>
+                  <path d={path} fill={colors[i]} stroke="#fff" strokeWidth={2} />
+                  <title>{slice.label}</title>
+                  <foreignObject
+                    x={avatarPoint.x - avatarPx / 2}
+                    y={avatarPoint.y - avatarPx / 2}
+                    width={avatarPx}
+                    height={avatarPx}
+                    style={{ overflow: "visible" }}
                   >
-                    {slice.label}
-                  </text>
+                    <div className="flex items-center justify-center w-full h-full">
+                      <TeamAvatar name={slice.key} size={avatarSize} />
+                    </div>
+                  </foreignObject>
                 </g>
-              </g>
-            );
-          })
+              );
+            });
+          })()
         )}
         <circle cx={cx} cy={cy} r={size * 0.07} fill="#ffffff" stroke="#e5e7eb" strokeWidth={2} />
       </svg>

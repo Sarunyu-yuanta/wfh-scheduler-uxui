@@ -52,6 +52,7 @@ function shuffle<T>(arr: T[]): T[] {
 export function generateSchedule(
   names: string[] = TEAM_NAMES,
   locked: Record<string, DayId[]> = LOCKED_WFH,
+  otherFixed: Record<string, DayId[]> = {},
 ): Schedule {
   const result: Schedule = {};
   for (const [name, days] of Object.entries(locked)) {
@@ -60,14 +61,20 @@ export function generateSchedule(
 
   const eligible: DayId[] = ["mon", "tue", "thu", "fri"];
 
-  // WFH counts from locked assignments
+  // WFH counts from locked assignments, plus anyone outside this roll who
+  // already has a schedule — so the balance target reflects the whole team,
+  // not just the people being rolled this round.
   const lockedCnt: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
   for (const name of Object.keys(result)) {
     for (const d of result[name]) lockedCnt[d as DayId]++;
   }
+  for (const days of Object.values(otherFixed)) {
+    for (const d of days) lockedCnt[d]++;
+  }
 
   // Target: spread total WFH evenly (people × 2 days / 4 eligible days)
-  const targetPerDay = Math.round((names.length * 2) / eligible.length);
+  const totalHeadcount = names.length + Object.keys(otherFixed).length;
+  const targetPerDay = Math.round((totalHeadcount * 2) / eligible.length);
   const remaining: Record<DayId, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
   for (const d of eligible) remaining[d] = targetPerDay - lockedCnt[d];
 

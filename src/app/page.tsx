@@ -17,7 +17,6 @@ import {
   Toaster,
   Toggle,
   Checkbox,
-  Input,
   useIsMobile,
   Table,
   TableHead,
@@ -73,6 +72,7 @@ function PageContent() {
   const weekStarts = monthWeekStarts(monthOffset);
   const activeWeekStart = monthOffset === 0 ? currentWeekStart() : weekStarts[0];
   const days = weekDayLabels(activeWeekStart);
+  const viewMonthKey = monthKeyForOffset(monthOffset);
 
   const [scheduleMap, setScheduleMap] = useState<Record<string, Schedule>>({});
   const [schedulesLoaded, setSchedulesLoaded] = useState(false);
@@ -92,8 +92,6 @@ function PageContent() {
   const [selectedForRoll, setSelectedForRoll] = useState<Set<string>>(
     new Set(TEAM_NAMES),
   );
-  const [newMemberName, setNewMemberName] = useState("");
-  const [isAddingMember, setIsAddingMember] = useState(false);
 
   const yimIncludedInRoll = selectedForRoll.has("Yim");
 
@@ -105,6 +103,7 @@ function PageContent() {
     rollTarget === 0 ? currentWeekStart() : monthWeekStarts(1)[0];
   const existingForRollTarget: Schedule =
     scheduleMap[rollTargetWeekStart] ?? (rollTarget === 0 ? SEED_SCHEDULE : {});
+  const rollMonthKey = monthKeyForOffset(rollTarget);
 
   const removeToast = useCallback((id: string) => {
     setToasts((t) => t.filter((x) => x.id !== id));
@@ -141,27 +140,6 @@ function PageContent() {
     });
   }, []);
 
-  const addMember = useCallback(async () => {
-    const name = newMemberName.trim();
-    if (!name) return;
-    setIsAddingMember(true);
-    try {
-      const r = await fetch("/api/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (r.ok) {
-        const data: { names: string[] } = await r.json();
-        setTeamNames(data.names);
-        setSelectedForRoll((prev) => new Set([...prev, name]));
-        setNewMemberName("");
-      }
-    } finally {
-      setIsAddingMember(false);
-    }
-  }, [newMemberName]);
-
   // If Yim gets excluded from this roll, locking her combo no longer applies
   useEffect(() => {
     if (!yimIncludedInRoll && yimLocked) {
@@ -188,7 +166,6 @@ function PageContent() {
     setYimLocked(false);
     setYimCombo(VALID_COMBOS[0]);
     setSelectedForRoll(new Set(teamNames));
-    setNewMemberName("");
     setModalOpen(true);
   }, [monthOffset, teamNames]);
 
@@ -198,12 +175,20 @@ function PageContent() {
     const names = Array.from(selectedForRoll);
     const locked: Record<string, DayId[]> =
       yimLocked && selectedForRoll.has("Yim") ? { Yim: yimCombo } : {};
+    // People left out of this roll keep their existing days — feed those in
+    // so the balance target accounts for the whole team, not just this subset.
+    const otherFixed: Record<string, DayId[]> = Object.fromEntries(
+      teamNames
+        .filter((n) => !selectedForRoll.has(n))
+        .map((n) => [n, existingForRollTarget[n] ?? []])
+        .filter(([, days]) => (days as DayId[]).length > 0),
+    );
     setTimeout(() => {
-      setPreview(generateSchedule(names, locked));
+      setPreview(generateSchedule(names, locked, otherFixed));
       setLoadProgress(100);
       setIsLoading(false);
     }, 700);
-  }, [selectedForRoll, yimLocked, yimCombo]);
+  }, [selectedForRoll, yimLocked, yimCombo, teamNames, existingForRollTarget]);
 
   const undo = useCallback(async (offset: 0 | 1) => {
     setIsUndoing(true);
@@ -333,7 +318,7 @@ function PageContent() {
             const officeMembers = teamNames.filter(
               (n) => !wfhMembers.includes(n),
             );
-            const toItems = (names: string[]) => names.map((name) => avatarStackItem(name));
+            const toItems = (names: string[]) => names.map((name) => avatarStackItem(name, viewMonthKey));
             return (
               <div
                 key={day.id}
@@ -427,9 +412,9 @@ function PageContent() {
                   <TableRow key={name}>
                     <TableCell fixed="left" fixedShadow="right">
                       <div className="flex items-center gap-3">
-                        <TeamAvatar name={name} size="m" />
+                        <TeamAvatar name={name} size="m" monthKey={viewMonthKey} />
                         <span className="type-body-2 text-foreground">
-                          {displayName(name)}
+                          {displayName(name, viewMonthKey)}
                         </span>
                         {LOCKED_WFH[name] && (
                           <Tag text="ล็อควัน" variant="yellow" size="small" />
@@ -524,7 +509,7 @@ function PageContent() {
                   }))
                   .filter((g) => g.members.length > 0);
 
-                const toItems = (names: string[]) => names.map((n) => avatarStackItem(n));
+                const toItems = (names: string[]) => names.map((n) => avatarStackItem(n, viewMonthKey));
 
                 return (
                   <div
@@ -532,9 +517,9 @@ function PageContent() {
                     className="bg-card border border-border rounded-xl p-3 flex flex-col gap-3"
                   >
                     <div className="flex items-center gap-2">
-                      <TeamAvatar name={name} size="s" />
+                      <TeamAvatar name={name} size="s" monthKey={viewMonthKey} />
                       <span className="type-body-2 text-foreground truncate">
-                        {displayName(name)}
+                        {displayName(name, viewMonthKey)}
                       </span>
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -680,8 +665,8 @@ function PageContent() {
                     {[...teamNames]
                       .sort(
                         (a, b) =>
-                          Number(displayName(a) === "Anonymous") -
-                          Number(displayName(b) === "Anonymous"),
+                          Number(displayName(a, rollMonthKey) === "Anonymous") -
+                          Number(displayName(b, rollMonthKey) === "Anonymous"),
                       )
                       .map((name) => (
                       <div
@@ -690,37 +675,19 @@ function PageContent() {
                         className="w-full px-3 py-2.5 hover:bg-muted transition-colors flex items-center justify-between gap-2 cursor-pointer"
                       >
                         <span className="flex items-center gap-2 type-body-2 text-foreground">
-                          <TeamAvatar name={name} size="s" />
-                          {displayName(name)}
+                          <TeamAvatar name={name} size="s" monthKey={rollMonthKey} />
+                          {displayName(name, rollMonthKey)}
                         </span>
                         <div onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedForRoll.has(name)}
                             onChange={() => toggleRollMember(name)}
-                            ariaLabel={displayName(name)}
+                            ariaLabel={displayName(name, rollMonthKey)}
                           />
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-                <div className="flex gap-2 items-start">
-                  <div className="flex-1">
-                    <Input
-                      value={newMemberName}
-                      onChange={setNewMemberName}
-                      placeholder="ใส่ชื่อคนที่ต้องการเพิ่ม"
-                    />
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="xl"
-                    onClick={addMember}
-                    disabled={!newMemberName.trim() || isAddingMember}
-                    className="h-12"
-                  >
-                    {isAddingMember ? "กำลังเพิ่ม..." : "เพิ่ม"}
-                  </Button>
                 </div>
               </div>
             )}
@@ -816,11 +783,10 @@ function PageContent() {
                   })}
                 </div>
 
-                {/* Person list */}
+                {/* Person list — only people included in this roll */}
                 <div className="rounded-2xl overflow-hidden border border-border">
-                  {teamNames.map((name, idx) => {
-                    const wfhDays = preview[name] ?? existingForRollTarget[name] ?? [];
-                    const wasRolled = name in preview;
+                  {teamNames.filter((name) => name in preview).map((name, idx) => {
+                    const wfhDays = preview[name] ?? [];
                     return (
                       <div
                         key={name}
@@ -829,19 +795,14 @@ function PageContent() {
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <TeamAvatar name={name} size="m" />
+                          <TeamAvatar name={name} size="m" monthKey={rollMonthKey} />
                           <div>
                             <p className="type-body-2 text-foreground">
-                              {displayName(name)}
+                              {displayName(name, rollMonthKey)}
                             </p>
                             {(LOCKED_WFH[name] || (name === "Yim" && yimLocked)) && (
                               <p className="type-caption text-muted-foreground">
                                 ล็อควัน
-                              </p>
-                            )}
-                            {!wasRolled && (
-                              <p className="type-caption text-muted-foreground">
-                                ไม่ได้เลือกสุ่มรอบนี้
                               </p>
                             )}
                           </div>
