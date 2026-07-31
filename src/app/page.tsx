@@ -89,6 +89,7 @@ function PageContent() {
   const [yimCombo, setYimCombo] = useState<DayId[]>(VALID_COMBOS[0]);
   const [yimBoxHovered, setYimBoxHovered] = useState(false);
   const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
+  const [photoKeys, setPhotoKeys] = useState<Record<string, string>>({});
   const [selectedForRoll, setSelectedForRoll] = useState<Set<string>>(
     new Set(TEAM_NAMES),
   );
@@ -124,8 +125,9 @@ function PageContent() {
   useEffect(() => {
     fetch("/api/team")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data: { names: string[] }) => {
+      .then((data: { names: string[]; photoKeys: Record<string, string> }) => {
         setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
         setSelectedForRoll(new Set(data.names));
       })
       .catch(() => {});
@@ -318,7 +320,7 @@ function PageContent() {
             const officeMembers = teamNames.filter(
               (n) => !wfhMembers.includes(n),
             );
-            const toItems = (names: string[]) => names.map((name) => avatarStackItem(name, viewMonthKey));
+            const toItems = (names: string[]) => names.map((name) => avatarStackItem(name, photoKeys[name] ?? name, viewMonthKey));
             return (
               <div
                 key={day.id}
@@ -412,7 +414,7 @@ function PageContent() {
                   <TableRow key={name}>
                     <TableCell fixed="left" fixedShadow="right">
                       <div className="flex items-center gap-3">
-                        <TeamAvatar name={name} size="m" monthKey={viewMonthKey} />
+                        <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="m" monthKey={viewMonthKey} />
                         <span className="type-body-2 text-foreground">
                           {displayName(name, viewMonthKey)}
                         </span>
@@ -509,7 +511,7 @@ function PageContent() {
                   }))
                   .filter((g) => g.members.length > 0);
 
-                const toItems = (names: string[]) => names.map((n) => avatarStackItem(n, viewMonthKey));
+                const toItems = (names: string[]) => names.map((n) => avatarStackItem(n, photoKeys[n] ?? n, viewMonthKey));
 
                 return (
                   <div
@@ -517,7 +519,7 @@ function PageContent() {
                     className="bg-card border border-border rounded-xl p-3 flex flex-col gap-3"
                   >
                     <div className="flex items-center gap-2">
-                      <TeamAvatar name={name} size="s" monthKey={viewMonthKey} />
+                      <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="s" monthKey={viewMonthKey} />
                       <span className="type-body-2 text-foreground truncate">
                         {displayName(name, viewMonthKey)}
                       </span>
@@ -675,7 +677,7 @@ function PageContent() {
                         className="w-full px-3 py-2.5 hover:bg-muted transition-colors flex items-center justify-between gap-2 cursor-pointer"
                       >
                         <span className="flex items-center gap-2 type-body-2 text-foreground">
-                          <TeamAvatar name={name} size="s" monthKey={rollMonthKey} />
+                          <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="s" monthKey={rollMonthKey} />
                           {displayName(name, rollMonthKey)}
                         </span>
                         <div onClick={(e) => e.stopPropagation()}>
@@ -795,7 +797,7 @@ function PageContent() {
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <TeamAvatar name={name} size="m" monthKey={rollMonthKey} />
+                          <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="m" monthKey={rollMonthKey} />
                           <div>
                             <p className="type-body-2 text-foreground">
                               {displayName(name, rollMonthKey)}

@@ -20,11 +20,11 @@ export function displayName(name: string, monthKey: string = monthKeyForOffset(0
   return isReplaced(name, monthKey) ? "Anonymous" : name;
 }
 
-const CANDIDATES = (name: string) => [
-  `/avatars/${name}.jpg`,
-  `/avatars/${name}.jpeg`,
-  `/avatars/${name.toLowerCase()}.jpg`,
-  `/avatars/${name.toLowerCase()}.jpeg`,
+const CANDIDATES = (photoKey: string) => [
+  `/avatars/${photoKey}.jpg`,
+  `/avatars/${photoKey}.jpeg`,
+  `/avatars/${photoKey.toLowerCase()}.jpg`,
+  `/avatars/${photoKey.toLowerCase()}.jpeg`,
 ];
 
 // AvatarStack items are built synchronously (no <img> onload/onerror probe
@@ -32,21 +32,25 @@ const CANDIDATES = (name: string) => [
 // to a text/initials item instead of a src that will 404.
 const KNOWN_PHOTOS = new Set(["Yim", "Art", "Kes", "Khim", "Nook", "Few", "Max", "Yok"]);
 
+// photoKey is a stable identity for the avatar image — independent of the
+// (renameable) display name — so renaming someone doesn't lose their photo.
+// Defaults to name for callers that haven't fetched a photoKey mapping yet.
 export function avatarStackItem(
   name: string,
+  photoKey: string = name,
   monthKey: string = monthKeyForOffset(0),
 ): AvatarStackItem {
   if (isReplaced(name, monthKey)) {
     return { type: "placeholder" };
   }
-  if (!KNOWN_PHOTOS.has(name)) {
+  if (!KNOWN_PHOTOS.has(photoKey)) {
     return { type: "text", initials: name[0] };
   }
-  return { src: `/avatars/${name.toLowerCase()}.jpeg`, alt: name, initials: name[0] };
+  return { src: `/avatars/${photoKey.toLowerCase()}.jpeg`, alt: name, initials: name[0] };
 }
 
-async function resolvePhoto(name: string): Promise<string | null> {
-  for (const path of CANDIDATES(name)) {
+async function resolvePhoto(photoKey: string): Promise<string | null> {
+  for (const path of CANDIDATES(photoKey)) {
     const ok = await new Promise<boolean>((res) => {
       const img = new Image();
       img.onload = () => res(true);
@@ -60,10 +64,12 @@ async function resolvePhoto(name: string): Promise<string | null> {
 
 export function TeamAvatar({
   name,
+  photoKey = name,
   size = "s",
   monthKey = monthKeyForOffset(0),
 }: {
   name: string;
+  photoKey?: string;
   size?: AvatarSize;
   monthKey?: string;
 }) {
@@ -73,11 +79,11 @@ export function TeamAvatar({
   useEffect(() => {
     if (isAnonymous) return;
     let cancelled = false;
-    resolvePhoto(name).then((src) => {
+    resolvePhoto(photoKey).then((src) => {
       if (!cancelled) setPhotoSrc(src);
     });
     return () => { cancelled = true; };
-  }, [name, isAnonymous]);
+  }, [photoKey, isAnonymous]);
 
   // undefined = still probing → show initials as placeholder
   const avatar = isAnonymous ? (

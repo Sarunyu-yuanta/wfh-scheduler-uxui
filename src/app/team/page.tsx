@@ -45,6 +45,7 @@ function MemberMenuItems({
 export default function TeamPage() {
   const isMobile = useIsMobile();
   const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
+  const [photoKeys, setPhotoKeys] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [isAddingMember, setIsAddingMember] = useState(false);
@@ -70,7 +71,10 @@ export default function TeamPage() {
   useEffect(() => {
     fetch("/api/team")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data: { names: string[] }) => setTeamNames(data.names))
+      .then((data: { names: string[]; photoKeys: Record<string, string> }) => {
+        setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
+      })
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
@@ -88,8 +92,9 @@ export default function TeamPage() {
         body: JSON.stringify({ name }),
       });
       if (r.ok) {
-        const data: { names: string[] } = await r.json();
+        const data: { names: string[]; photoKeys: Record<string, string> } = await r.json();
         setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
         setNewMemberName("");
         setAddMemberOpen(false);
         notify(`เพิ่ม ${name} แล้ว`);
@@ -130,6 +135,7 @@ export default function TeamPage() {
       const data = await r.json();
       if (r.ok) {
         setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
         setRenameTarget(null);
         notify(`เปลี่ยนชื่อเป็น ${trimmed} แล้ว`);
       } else {
@@ -157,8 +163,9 @@ export default function TeamPage() {
         body: JSON.stringify({ name: deleteTarget }),
       });
       if (r.ok) {
-        const data: { names: string[] } = await r.json();
+        const data: { names: string[]; photoKeys: Record<string, string> } = await r.json();
         setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
         notify(`ลบ ${displayName(deleteTarget)} แล้ว`);
       }
     } finally {
@@ -274,7 +281,7 @@ export default function TeamPage() {
                         </Popover>
                       )}
                     </div>
-                    <TeamAvatar name={name} size="xl" />
+                    <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="xl" />
                     <span className="type-body-2 text-foreground text-center truncate w-full">
                       {displayName(name)}
                     </span>

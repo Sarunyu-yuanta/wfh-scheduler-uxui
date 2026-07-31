@@ -26,6 +26,7 @@ import {
 export default function HistoryPage() {
   const [allWeeks, setAllWeeks] = useState<Record<string, Schedule>>({});
   const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
+  const [photoKeys, setPhotoKeys] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [restoredMonth, setRestoredMonth] = useState<string | null>(null);
@@ -42,7 +43,10 @@ export default function HistoryPage() {
   useEffect(() => {
     fetch("/api/team")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data: { names: string[] }) => setTeamNames(data.names))
+      .then((data: { names: string[]; photoKeys: Record<string, string> }) => {
+        setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
+      })
       .catch(() => {});
   }, []);
 
@@ -154,7 +158,7 @@ export default function HistoryPage() {
                         <TableRow key={name}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <TeamAvatar name={name} size="m" monthKey={rowMonthKey} />
+                              <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="m" monthKey={rowMonthKey} />
                               <span className="type-body-2 text-foreground">{displayName(name, rowMonthKey)}</span>
                               {LOCKED_WFH[name] && (
                                 <Tag text="ล็อควัน" variant="yellow" size="small" />

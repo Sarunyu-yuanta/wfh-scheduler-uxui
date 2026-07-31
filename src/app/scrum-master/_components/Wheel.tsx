@@ -7,6 +7,8 @@ export interface WheelSlice {
   /** Raw team member name — used both as the React key and to resolve the avatar. */
   key: string;
   label: string;
+  /** Stable photo identity — falls back to key if not provided. */
+  photoKey?: string;
 }
 
 export interface WheelHandle {
@@ -152,7 +154,7 @@ export const Wheel = forwardRef<WheelHandle, WheelProps>(function Wheel(
                     style={{ overflow: "visible" }}
                   >
                     <div className="flex items-center justify-center w-full h-full">
-                      <TeamAvatar name={slice.key} size={avatarSize} />
+                      <TeamAvatar name={slice.key} photoKey={slice.photoKey ?? slice.key} size={avatarSize} />
                     </div>
                   </foreignObject>
                 </g>

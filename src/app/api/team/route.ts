@@ -2,25 +2,36 @@ import { NextResponse } from "next/server";
 import { getSql, ensureTable } from "@/lib/db";
 import { TEAM_NAMES } from "@/lib/schedule";
 
+function toResponse(rows: { name: string; photo_key: string | null }[]) {
+  return NextResponse.json({
+    names: rows.map((r) => r.name),
+    photoKeys: Object.fromEntries(rows.map((r) => [r.name, r.photo_key ?? r.name])),
+  });
+}
+
 export async function GET() {
   try {
     await ensureTable();
     const sql = getSql();
 
-    const rows = await sql`SELECT name FROM team_members ORDER BY created_at`;
+    const rows = await sql`
+      SELECT name, photo_key FROM team_members ORDER BY created_at
+    `;
 
     if (rows.length === 0) {
       for (const name of TEAM_NAMES) {
         await sql`
-          INSERT INTO team_members (name) VALUES (${name})
+          INSERT INTO team_members (name, photo_key) VALUES (${name}, ${name})
           ON CONFLICT DO NOTHING
         `;
       }
-      const seeded = await sql`SELECT name FROM team_members ORDER BY created_at`;
-      return NextResponse.json({ names: seeded.map((r) => r.name as string) });
+      const seeded = await sql`
+        SELECT name, photo_key FROM team_members ORDER BY created_at
+      `;
+      return toResponse(seeded as { name: string; photo_key: string | null }[]);
     }
 
-    return NextResponse.json({ names: rows.map((r) => r.name as string) });
+    return toResponse(rows as { name: string; photo_key: string | null }[]);
   } catch (err) {
     console.error("[GET /api/team]", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -33,15 +44,18 @@ export async function POST(req: Request) {
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "name required" }, { status: 400 });
     }
+    const trimmed = name.trim();
 
     await ensureTable();
     const sql = getSql();
     await sql`
-      INSERT INTO team_members (name) VALUES (${name.trim()})
+      INSERT INTO team_members (name, photo_key) VALUES (${trimmed}, ${trimmed})
       ON CONFLICT DO NOTHING
     `;
-    const rows = await sql`SELECT name FROM team_members ORDER BY created_at`;
-    return NextResponse.json({ names: rows.map((r) => r.name as string) });
+    const rows = await sql`
+      SELECT name, photo_key FROM team_members ORDER BY created_at
+    `;
+    return toResponse(rows as { name: string; photo_key: string | null }[]);
   } catch (err) {
     console.error("[POST /api/team]", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -69,9 +83,13 @@ export async function PATCH(req: Request) {
       }
     }
 
+    // Only the display name changes — photo_key is left untouched, so a
+    // renamed member keeps whatever photo they already had.
     await sql`UPDATE team_members SET name = ${trimmed} WHERE name = ${oldName}`;
-    const rows = await sql`SELECT name FROM team_members ORDER BY created_at`;
-    return NextResponse.json({ names: rows.map((r) => r.name as string) });
+    const rows = await sql`
+      SELECT name, photo_key FROM team_members ORDER BY created_at
+    `;
+    return toResponse(rows as { name: string; photo_key: string | null }[]);
   } catch (err) {
     console.error("[PATCH /api/team]", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -88,8 +106,10 @@ export async function DELETE(req: Request) {
     await ensureTable();
     const sql = getSql();
     await sql`DELETE FROM team_members WHERE name = ${name}`;
-    const rows = await sql`SELECT name FROM team_members ORDER BY created_at`;
-    return NextResponse.json({ names: rows.map((r) => r.name as string) });
+    const rows = await sql`
+      SELECT name, photo_key FROM team_members ORDER BY created_at
+    `;
+    return toResponse(rows as { name: string; photo_key: string | null }[]);
   } catch (err) {
     console.error("[DELETE /api/team]", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });

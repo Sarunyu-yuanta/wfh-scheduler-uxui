@@ -25,7 +25,14 @@ export async function ensureTable() {
   await sql`
     CREATE TABLE IF NOT EXISTS team_members (
       name        TEXT         PRIMARY KEY,
+      photo_key   TEXT,
       created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
     )
   `;
+  // Stable photo identity, independent of the (renameable) display name —
+  // added after the initial release, so existing tables need this migrated in.
+  await sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS photo_key TEXT`;
+  // Backfill rows created before photo_key existed — must happen before any
+  // rename touches them, or the original name (and its photo) is lost for good.
+  await sql`UPDATE team_members SET photo_key = name WHERE photo_key IS NULL`;
 }

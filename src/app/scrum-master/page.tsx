@@ -17,6 +17,7 @@ import { TEAM_NAMES } from "@/lib/schedule";
 export default function ScrumMasterPage() {
   const isMobile = useIsMobile();
   const [teamNames, setTeamNames] = useState<string[]>(TEAM_NAMES);
+  const [photoKeys, setPhotoKeys] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set(TEAM_NAMES));
   const [spinning, setSpinning] = useState(false);
@@ -33,11 +34,12 @@ export default function ScrumMasterPage() {
   useEffect(() => {
     fetch("/api/team")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data: { names: string[] }) => {
+      .then((data: { names: string[]; photoKeys: Record<string, string> }) => {
         setTeamNames(data.names);
+        setPhotoKeys(data.photoKeys);
         setSelected(new Set(data.names));
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoaded(true));
   }, []);
 
@@ -51,7 +53,11 @@ export default function ScrumMasterPage() {
   }, []);
 
   const participants = teamNames.filter((n) => selected.has(n));
-  const slices = participants.map((name) => ({ key: name, label: displayName(name) }));
+  const slices = participants.map((name) => ({
+    key: name,
+    label: displayName(name),
+    photoKey: photoKeys[name] ?? name,
+  }));
 
   const spin = useCallback(() => {
     if (participants.length < 2 || spinning) return;
@@ -93,7 +99,7 @@ export default function ScrumMasterPage() {
 
   const resultBody = winner && (
     <div className="flex flex-col gap-4 items-center">
-      <TeamAvatar name={winner} size="xl" />
+      <TeamAvatar name={winner} photoKey={photoKeys[winner] ?? winner} size="xl" />
       <div className="text-center">
         <p className="type-caption text-muted-foreground">
           Scrum Master ประจำสัปดาห์นี้
@@ -151,29 +157,29 @@ export default function ScrumMasterPage() {
                     </div>
                   </div>
 
-                <div className="bg-card border border-border rounded-xl overflow-hidden">
-                  <div className="roster-scroll flex flex-col divide-y divide-divider max-h-[400px] overflow-y-auto">
-                    {teamNames.map((name) => (
-                      <div
-                        key={name}
-                        onClick={() => toggle(name)}
-                        className="w-full px-3 py-2.5 hover:bg-muted transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                      >
-                        <span className="flex items-center gap-2 type-body-2 text-foreground">
-                          <TeamAvatar name={name} size="s" />
-                          {displayName(name)}
-                        </span>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selected.has(name)}
-                            onChange={() => toggle(name)}
-                            ariaLabel={displayName(name)}
-                          />
+                  <div className="bg-card border border-border rounded-xl overflow-hidden">
+                    <div className="roster-scroll flex flex-col divide-y divide-divider max-h-[400px] overflow-y-auto">
+                      {teamNames.map((name) => (
+                        <div
+                          key={name}
+                          onClick={() => toggle(name)}
+                          className="w-full px-3 py-2.5 hover:bg-muted transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2 type-body-2 text-foreground">
+                            <TeamAvatar name={name} photoKey={photoKeys[name] ?? name} size="s" />
+                            {displayName(name)}
+                          </span>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selected.has(name)}
+                              onChange={() => toggle(name)}
+                              ariaLabel={displayName(name)}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
                 </>
               )}
             </div>
