@@ -20,6 +20,18 @@ export function displayName(name: string, monthKey: string = monthKeyForOffset(0
   return isReplaced(name, monthKey) ? "Anonymous" : name;
 }
 
+const CANDIDATES = (name: string) => [
+  `/avatars/${name}.jpg`,
+  `/avatars/${name}.jpeg`,
+  `/avatars/${name.toLowerCase()}.jpg`,
+  `/avatars/${name.toLowerCase()}.jpeg`,
+];
+
+// AvatarStack items are built synchronously (no <img> onload/onerror probe
+// like TeamAvatar does), so anyone without a confirmed photo file falls back
+// to a text/initials item instead of a src that will 404.
+const KNOWN_PHOTOS = new Set(["Yim", "Art", "Kes", "Khim", "Nook", "Few", "Max", "Yok"]);
+
 export function avatarStackItem(
   name: string,
   monthKey: string = monthKeyForOffset(0),
@@ -27,15 +39,11 @@ export function avatarStackItem(
   if (isReplaced(name, monthKey)) {
     return { type: "placeholder" };
   }
+  if (!KNOWN_PHOTOS.has(name)) {
+    return { type: "text", initials: name[0] };
+  }
   return { src: `/avatars/${name.toLowerCase()}.jpeg`, alt: name, initials: name[0] };
 }
-
-const CANDIDATES = (name: string) => [
-  `/avatars/${name}.jpg`,
-  `/avatars/${name}.jpeg`,
-  `/avatars/${name.toLowerCase()}.jpg`,
-  `/avatars/${name.toLowerCase()}.jpeg`,
-];
 
 async function resolvePhoto(name: string): Promise<string | null> {
   for (const path of CANDIDATES(name)) {

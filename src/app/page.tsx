@@ -336,7 +336,7 @@ function PageContent() {
                     <AvatarStack
                       items={toItems(officeMembers)}
                       size="large"
-                      max={8}
+                      max={teamNames.length}
                     />
                   </div>
 
@@ -350,7 +350,7 @@ function PageContent() {
                         <AvatarStack
                           items={toItems(wfhMembers)}
                           size="large"
-                          max={8}
+                          max={teamNames.length}
                         />
                       ) : (
                         <p className="type-caption text-muted-foreground">—</p>
@@ -533,7 +533,7 @@ function PageContent() {
                           <AvatarStack
                             items={toItems(members)}
                             size="small"
-                            max={5}
+                            max={teamNames.length}
                           />
                         </div>
                       ))}
