@@ -86,6 +86,23 @@ export async function PATCH(req: Request) {
     // Only the display name changes — photo_key is left untouched, so a
     // renamed member keeps whatever photo they already had.
     await sql`UPDATE team_members SET name = ${trimmed} WHERE name = ${oldName}`;
+
+    // Carry the rename into existing schedule data too — otherwise the old
+    // name lingers as its own JSON key and shows up as a second, duplicate
+    // row (e.g. in history) next to the newly-renamed person.
+    if (trimmed !== oldName) {
+      await sql`
+        UPDATE schedule_weeks
+        SET schedule = (schedule - ${oldName}::text) || jsonb_build_object(${trimmed}::text, schedule->${oldName}::text)
+        WHERE schedule ? ${oldName}::text
+      `;
+      await sql`
+        UPDATE schedule_undo
+        SET schedule = (schedule - ${oldName}::text) || jsonb_build_object(${trimmed}::text, schedule->${oldName}::text)
+        WHERE schedule ? ${oldName}::text
+      `;
+    }
+
     const rows = await sql`
       SELECT name, photo_key FROM team_members ORDER BY created_at
     `;
