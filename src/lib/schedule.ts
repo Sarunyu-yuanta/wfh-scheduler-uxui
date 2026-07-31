@@ -124,11 +124,24 @@ export function generateSchedule(
       for (let j = 0; j < counts[i]; j++) comboPool.push(combo);
     });
   } else {
-    // Fallback: greedy variance minimization (original algorithm)
+    // Fallback: greedy variance minimization, still capped per combo for
+    // diversity (same cap escalation as the exact search above).
     const cnt = { ...lockedCnt };
+    const comboUsed = new Map<string, number>();
+    const comboKey = (combo: DayId[]) => [...combo].sort().join(",");
     comboPool = [];
     for (let i = 0; i < n; i++) {
-      const scored = VALID_COMBOS.map((combo) => {
+      let candidates = VALID_COMBOS;
+      for (const cap of [2, 3, Infinity]) {
+        const allowed = VALID_COMBOS.filter(
+          (combo) => (comboUsed.get(comboKey(combo)) ?? 0) < cap,
+        );
+        if (allowed.length > 0) {
+          candidates = allowed;
+          break;
+        }
+      }
+      const scored = candidates.map((combo) => {
         const c = { ...cnt };
         for (const d of combo) c[d]++;
         const vals = eligible.map((d) => c[d]);
@@ -140,6 +153,7 @@ export function generateSchedule(
       const best = scored.filter((s) => s.v === min);
       const chosen = best[Math.floor(Math.random() * best.length)].combo;
       comboPool.push(chosen);
+      comboUsed.set(comboKey(chosen), (comboUsed.get(comboKey(chosen)) ?? 0) + 1);
       for (const d of chosen) cnt[d]++;
     }
   }
